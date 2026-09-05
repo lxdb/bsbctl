@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "instances": [{"id": "mac-resources", "generation": 1, "config": {}}],
+  "sessions": [{
+    "start": {
+      "instance": {"id": "mac-resources", "generation": 1},
+      "action": "open",
+      "session_token": "mac-resources-session",
+      "trigger": {"kind": "launcher"}
+    },
+    "inputs": [{
+      "sequence": 1,
+      "occurred_at": "2026-09-03T12:00:00Z",
+      "instance": {"id": "mac-resources", "generation": 1},
+      "session_token": "mac-resources-session",
+      "input": {"button": {"button": "back", "action": "press"}}
+    }],
+    "end": {"instance": {"id": "mac-resources", "generation": 1}, "session_token": "mac-resources-session"}
+  }]
+}
