@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "show_sensitive_request_details": {
+      "type": "boolean",
+      "default": true,
+      "description": "Show bounded command, reason, path, or permission information on the device. Set false for a shared or visible device."
+    },
+    "show_quota": {
+      "type": "boolean",
+      "default": false,
+      "description": "Publish Codex account quota from the app-server connection. Leave false when using the standalone quota plugin."
+    },
+    "quota_warning_remaining_percent": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100,
+      "default": 20
+    },
+    "quota_critical_remaining_percent": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 99,
+      "default": 5
+    }
+  },
+  "additionalProperties": false
+}

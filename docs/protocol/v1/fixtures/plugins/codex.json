@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "instances": [{"id": "codex", "generation": 1, "config": {}}],
+  "sessions": [{
+    "start": {"instance": {"id": "codex", "generation": 1}, "action": "open", "session_token": "codex-session", "trigger": {"kind": "launcher"}},
+    "inputs": [{
+      "sequence": 1,
+      "occurred_at": "2026-08-29T12:00:00Z",
+      "instance": {"id": "codex", "generation": 1},
+      "session_token": "codex-session",
+      "input": {"button": {"button": "back", "action": "press"}}
+    }],
+    "end": {"instance": {"id": "codex", "generation": 1}, "session_token": "codex-session"}
+  }],
+  "operations": [
+    {"instance": {"id": "codex", "generation": 1}, "operation": "sessions", "payload": {}},
+    {"instance": {"id": "codex", "generation": 1}, "operation": "pin", "payload": {"thread_id": "fixture-thread"}},
+    {"instance": {"id": "codex", "generation": 1}, "operation": "unpin", "payload": {}}
+  ]
+}

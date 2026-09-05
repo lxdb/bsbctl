@@ -1,0 +1,52 @@
+{
+  "config": {
+    "show_sensitive_request_details": true,
+    "show_quota": true
+  },
+  "launch_action": "open",
+  "policies": {
+    "attention": {
+      "policy": "attention",
+      "activation_action": "open"
+    },
+    "guidance": {
+      "policy": "when_relevant"
+    },
+    "outcome": {
+      "policy": "when_relevant",
+      "activation_action": "open"
+    },
+    "activity": {
+      "policy": "rotation",
+      "activation_action": "open",
+      "rotation_interval_ms": 30000,
+      "rotation_jitter_percent": 10
+    },
+    "progress": {
+      "policy": "when_relevant",
+      "activation_action": "open",
+      "cooldown_ms": 1
+    },
+    "overview": {
+      "policy": "rotation",
+      "activation_action": "open",
+      "rotation_interval_ms": 60000,
+      "rotation_jitter_percent": 10
+    },
+    "connection": {
+      "policy": "when_relevant",
+      "activation_action": "open"
+    },
+    "detail": {
+      "policy": "interactive"
+    },
+    "quota-summary": {
+      "policy": "rotation",
+      "rotation_interval_ms": 300000,
+      "rotation_jitter_percent": 10
+    },
+    "quota-pressure": {
+      "policy": "when_relevant"
+    }
+  }
+}
