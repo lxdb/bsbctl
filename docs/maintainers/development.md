@@ -9,7 +9,7 @@ Use this workflow to build bsbctl and first-party plugins from a checkout. It cr
 - ShellCheck 0.11.0 for the full repository verification.
 - A reachable BUSY Bar endpoint for device tests only.
 
-The committed module uses `github.com/lxdb/busylib-go v0.2.0`. An ignored `go.work` can select a sibling busylib-go checkout without changing the committed dependency.
+The committed module uses `github.com/lxdb/busylib-go v0.3.1`. An ignored `go.work` can select a sibling busylib-go checkout without changing the committed dependency.
 
 ## Reinstall changes locally
 
