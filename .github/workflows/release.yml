@@ -1,0 +1,159 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      catalog_sequence:
+        description: Monotonic stable-catalog sequence
+        required: true
+        type: number
+      catalog_generated_at:
+        description: Catalog generation time in RFC3339 UTC
+        required: true
+        type: string
+      catalog_key_id:
+        description: Authorized tracked catalog public-key ID
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  GOTOOLCHAIN: local
+  GOWORK: off
+
+jobs:
+  build:
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            goarch: arm64
+            target: darwin/arm64
+          - runner: macos-15-intel
+            goarch: amd64
+            target: darwin/amd64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Fail-closed release preflight
+        run: scripts/verify.sh preflight
+      - name: Build immutable artifact twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_date_epoch="$(git show -s --format=%ct "$GITHUB_SHA")"
+          go run ./cmd/releasectl package --root . --out artifacts-first --goos darwin --goarch "${{ matrix.goarch }}" --source-date-epoch "$source_date_epoch"
+          go run ./cmd/releasectl package --root . --out artifacts-second --goos darwin --goarch "${{ matrix.goarch }}" --source-date-epoch "$source_date_epoch"
+          diff -rq artifacts-first artifacts-second
+          go run ./cmd/releasectl inspect --dir artifacts-first
+          (cd artifacts-first && shasum -a 256 -c SHA256SUMS)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-darwin-${{ matrix.goarch }}
+          path: artifacts-first
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+  publish:
+    needs: build
+    runs-on: macos-15
+    timeout-minutes: 30
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Build protected release controller without signing material
+        run: go build -trimpath -o "$RUNNER_TEMP/releasectl" ./cmd/releasectl
+      - name: Fetch only the exact release tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_tag_refspecs=()
+          while IFS= read -r refspec; do
+            release_tag_refspecs+=("$refspec")
+          done < <("$RUNNER_TEMP/releasectl" release-tags --root .)
+          test "${#release_tag_refspecs[@]}" -gt 0
+          git fetch --no-tags --no-recurse-submodules origin "${release_tag_refspecs[@]}"
+      - name: Bind every release tag to the built commit
+        run: go run ./cmd/releasectl verify-tags --root . --commit "$GITHUB_SHA"
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-darwin-arm64
+          path: release-artifacts/release-darwin-arm64
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-darwin-amd64
+          path: release-artifacts/release-darwin-amd64
+      - name: Reinspect immutable build outputs
+        run: |
+          go run ./cmd/releasectl inspect --dir release-artifacts/release-darwin-arm64
+          go run ./cmd/releasectl inspect --dir release-artifacts/release-darwin-amd64
+      - name: Build stable catalog from verified plugin artifacts
+        env:
+          CATALOG_SEQUENCE: ${{ inputs.catalog_sequence }}
+          CATALOG_GENERATED_AT: ${{ inputs.catalog_generated_at }}
+        run: |
+          go run ./cmd/releasectl catalog --root . \
+            --artifacts release-artifacts/release-darwin-arm64 \
+            --artifacts release-artifacts/release-darwin-amd64 \
+            --base-url "https://github.com/$GITHUB_REPOSITORY/releases/download" \
+            --sequence "$CATALOG_SEQUENCE" \
+            --generated-at "$CATALOG_GENERATED_AT" \
+            --out release-artifacts/catalog.json
+      - name: Sign catalog from protected stdin only
+        env:
+          CATALOG_SIGNING_PRIVATE_KEY_B64: ${{ secrets.CATALOG_SIGNING_PRIVATE_KEY_B64 }}
+          CATALOG_KEY_ID: ${{ inputs.catalog_key_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          catalog_signing_private_key_b64="$CATALOG_SIGNING_PRIVATE_KEY_B64"
+          unset CATALOG_SIGNING_PRIVATE_KEY_B64
+          test -n "$catalog_signing_private_key_b64"
+          printf '%s' "$catalog_signing_private_key_b64" | "$RUNNER_TEMP/releasectl" sign-catalog \
+            --catalog release-artifacts/catalog.json \
+            --key-id "$CATALOG_KEY_ID" \
+            --out release-artifacts/catalog.sig
+          catalog_signing_private_key_b64=
+      - name: Verify the signed catalog with tracked production trust
+        run: |
+          go run ./cmd/releasectl verify-catalog \
+            --catalog release-artifacts/catalog.json \
+            --signature release-artifacts/catalog.sig
+      - name: Reconcile exact drafts, verify all, then publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          go run ./cmd/releasectl publish-releases \
+            --root . \
+            --commit "$GITHUB_SHA" \
+            --artifacts release-artifacts/release-darwin-arm64 \
+            --artifacts release-artifacts/release-darwin-amd64 \
+            --catalog release-artifacts/catalog.json \
+            --signature release-artifacts/catalog.sig

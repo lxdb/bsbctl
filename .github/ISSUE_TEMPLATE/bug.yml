@@ -1,0 +1,44 @@
+name: Bug report
+description: Report a reproducible bsbctl defect.
+title: "bug: "
+body:
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Observed behavior
+      description: Describe the result, exact error, and expected behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Provide the smallest safe sequence that reproduces the problem.
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Include the bsbctl version or commit, macOS version, and BUSY Bar firmware version when relevant.
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options: [Daemon or CLI, Built-in app, External plugin or protocol, Installation, Release artifact]
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Include relevant redacted status output or logs. Do not attach the complete local configuration.
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety
+      options:
+        - label: I removed credentials, device identifiers, calendar details, Codex session content, and other personal data.
+          required: true

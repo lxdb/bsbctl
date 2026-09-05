@@ -1,0 +1,80 @@
+name: Contracts
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contracts-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GOTOOLCHAIN: local
+  GOWORK: off
+
+jobs:
+  linux-pluginhost:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - run: scripts/verify.sh linux-pluginhost
+
+  release-preflight:
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - run: scripts/verify.sh preflight
+
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            goarch: arm64
+            target: darwin/arm64
+          - runner: macos-15-intel
+            goarch: amd64
+            target: darwin/amd64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Build twice and inspect
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_date_epoch="$(git show -s --format=%ct "$GITHUB_SHA")"
+          go run ./cmd/releasectl package --root . --out artifacts-first --goos darwin --goarch "${{ matrix.goarch }}" --source-date-epoch "$source_date_epoch"
+          go run ./cmd/releasectl package --root . --out artifacts-second --goos darwin --goarch "${{ matrix.goarch }}" --source-date-epoch "$source_date_epoch"
+          diff -rq artifacts-first artifacts-second
+          go run ./cmd/releasectl inspect --dir artifacts-first
+          (cd artifacts-first && shasum -a 256 -c SHA256SUMS)
+          for archive in artifacts-first/*.tar.gz; do
+            tar -tzf "$archive" | grep -qx 'sbom.cdx.json'
+          done

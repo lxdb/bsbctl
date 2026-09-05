@@ -1,0 +1,4 @@
+# Deterministic timing controls used by pluginhost and daemon integration tests.
+github.com/lxdb/bsbctl/internal/pluginhost	WithClock
+github.com/lxdb/bsbctl/internal/pluginhost	WithHealthInterval
+github.com/lxdb/bsbctl/internal/pluginhost	WithJitter
