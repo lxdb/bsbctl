@@ -1,0 +1,16 @@
+{
+    "config": {
+        "label": "MAIN",
+        "badge": "M"
+    },
+    "policies": {
+        "summary": {
+            "policy": "rotation",
+            "rotation_interval_ms": 300000,
+            "rotation_jitter_percent": 10
+        },
+        "pressure": {
+            "policy": "when_relevant"
+        }
+    }
+}
