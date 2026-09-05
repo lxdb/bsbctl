@@ -1,0 +1,10 @@
+{
+    "keys": [
+        {
+            "algorithm": "ed25519",
+            "id": "stable-2026",
+            "public_key_base64": "kuVahvekqoAnEzVqq76bmGcIL3brdv2DECK3Il2DRCc="
+        }
+    ],
+    "schema_version": 1
+}
