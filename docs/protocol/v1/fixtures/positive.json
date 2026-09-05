@@ -1,0 +1,23 @@
+[
+  {"name":"initialize request","definition":"InitializeRequest","value":{"core_version":"1.0.0","plugin_id":"dev.bsbctl.example","plugin_version":"1.0.0","protocol_version":"1.0"}},
+  {"name":"initialize result","definition":"InitializeResult","value":{"plugin_id":"dev.bsbctl.example","plugin_version":"1.0.0","protocol_version":"1.0","execution_modes":["resident","interactive"],"channels":[{"id":"main"}],"operations":[{"id":"refresh","kind":"command"}]}},
+  {"name":"replace instances","definition":"ReplaceInstancesRequest","value":{"instances":[{"id":"example","generation":1,"config":{},"secrets":{"token":"resolved"},"checkpoint":{"cursor":1}}]}},
+  {"name":"session start","definition":"SessionStartRequest","value":{"instance":{"id":"example","generation":1},"action":"open","session_token":"session-1","trigger":{"kind":"observation","observation":{"channel":"main","key":"item","revision":1}}}},
+  {"name":"session end","definition":"SessionEndRequest","value":{"instance":{"id":"example","generation":1},"session_token":"session-1"}},
+  {"name":"button session input","definition":"SessionInputRequest","value":{"sequence":5,"occurred_at":"2026-08-28T18:00:00Z","instance":{"id":"example","generation":1},"session_token":"session-1","input":{"button":{"button":"ok","action":"press"}}}},
+  {"name":"encoder session input","definition":"SessionInputRequest","value":{"sequence":6,"occurred_at":"2026-08-28T18:00:00Z","instance":{"id":"example","generation":1},"session_token":"session-1","input":{"encoder":{"delta":-1}}}},
+  {"name":"session input consumed","definition":"SessionInputResult","value":{"disposition":"consumed"}},
+  {"name":"operation request","definition":"OperationRequest","value":{"instance":{"id":"example","generation":1},"operation":"refresh","payload":{"force":true}}},
+  {"name":"operation result","definition":"OperationResult","value":{"payload":{"accepted":true}}},
+  {"name":"scene publish","definition":"PublishRequest","value":{"observation":{"instance":{"id":"example","generation":1},"channel":"main","key":"item","revision":1,"disposition":"actionable","impact":"notable","reason_code":"item_ready","observed_at":"2026-08-28T18:00:00Z","updated_at":"2026-08-28T18:00:00Z","valid_until":"2026-08-28T18:05:00Z","scene":{"elements":[{"id":"title","display":"front","text":{"value":"Ready","font":"normal","marquee":{"pixels_per_minute":600}}},{"id":"image","display":"front","image":{"asset":{"stock_name":"hourglass_5x5.image"}}},{"id":"animation","display":"back","animation":{"asset":{"package_path":"assets/brand.anim"},"loop":true}},{"id":"bar","display":"back","rectangle":{"width":10,"height":2,"color":"#35D07FFF"}},{"id":"countdown","display":"front","countdown":{"ends_at_unix_seconds":1787940300,"show_hours":"when_non_zero","color":"#EAF4F2FF"}}]},"audio":{"id":"ready","asset":{"stock_name":"calendar_event_starts.snd"},"expires_at":"2026-08-28T18:00:15Z"}}}},
+  {"name":"busy timer publish","definition":"PublishRequest","value":{"observation":{"instance":{"id":"example","generation":1},"channel":"main","key":"timer","revision":2,"disposition":"notable","impact":"normal","reason_code":"timer_active","observed_at":"2026-08-28T18:00:00Z","updated_at":"2026-08-28T18:00:00Z","valid_until":"2026-08-28T18:30:00Z","busy_timer":{"theme":"meeting"}}}},
+  {"name":"resolved publish","definition":"PublishRequest","value":{"observation":{"instance":{"id":"example","generation":1},"channel":"main","key":"item","revision":3,"disposition":"resolved","impact":"low","reason_code":"item_resolved","observed_at":"2026-08-28T18:00:00Z","updated_at":"2026-08-28T18:01:00Z"}}},
+  {"name":"withdraw","definition":"WithdrawRequest","value":{"instance":{"id":"example","generation":1},"channel":"main","key":"item"}},
+  {"name":"checkpoint","definition":"CheckpointRequest","value":{"instance":{"id":"example","generation":1},"data":{"cursor":1}}},
+  {"name":"complete session","definition":"CompleteSessionRequest","value":{"instance":{"id":"example","generation":1},"session_token":"session-1"}},
+  {"name":"begin session execution","definition":"SessionExecutionRequest","value":{"instance":{"id":"example","generation":1},"session_token":"session-1"}},
+  {"name":"health","definition":"HealthResult","value":{"healthy":true,"observed_at":"2026-08-28T18:00:00Z"}},
+  {"name":"log","definition":"LogNotification","value":{"level":"info","event":"refresh.complete","instance":{"id":"example","generation":1},"message":"refresh completed","fields":{"items":"3"}}},
+  {"name":"metric","definition":"MetricNotification","value":{"instance":{"id":"example","generation":1},"name":"refresh.duration","value":12.5,"unit":"milliseconds"}},
+  {"name":"domain error","definition":"ErrorData","value":{"kind":"not_ready"}}
+]

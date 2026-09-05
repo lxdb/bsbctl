@@ -1,0 +1,444 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bsbctl.dev/protocol/v1/schema.json",
+  "title": "bsbctl plugin protocol 1.0",
+  "$defs": {
+    "Identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+    },
+    "Timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "JSONObject": {
+      "type": "object"
+    },
+    "InstanceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generation"],
+      "properties": {
+        "id": {"$ref": "#/$defs/Identifier"},
+        "generation": {"type": "integer", "minimum": 1}
+      }
+    },
+    "Instance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "generation", "config"],
+      "properties": {
+        "id": {"$ref": "#/$defs/Identifier"},
+        "generation": {"type": "integer", "minimum": 1},
+        "config": {"$ref": "#/$defs/JSONObject"},
+        "secrets": {"type": "object", "additionalProperties": {"type": "string"}},
+        "checkpoint": {"$ref": "#/$defs/JSONObject"}
+      }
+    },
+    "Channel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {"id": {"$ref": "#/$defs/Identifier"}}
+    },
+    "OperationDescriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind"],
+      "properties": {
+        "id": {"$ref": "#/$defs/Identifier"},
+        "kind": {"enum": ["query", "command"]}
+      }
+    },
+    "InitializeRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["core_version", "plugin_id", "plugin_version", "protocol_version"],
+      "properties": {
+        "core_version": {"type": "string", "minLength": 1},
+        "plugin_id": {"$ref": "#/$defs/Identifier"},
+        "plugin_version": {"type": "string", "minLength": 1},
+        "protocol_version": {"const": "1.0"}
+      }
+    },
+    "InitializeResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["plugin_id", "plugin_version", "protocol_version", "execution_modes", "channels"],
+      "properties": {
+        "plugin_id": {"$ref": "#/$defs/Identifier"},
+        "plugin_version": {"type": "string", "minLength": 1},
+        "protocol_version": {"const": "1.0"},
+        "execution_modes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["resident", "interactive"]}},
+        "channels": {"type": "array", "items": {"$ref": "#/$defs/Channel"}},
+        "operations": {"type": "array", "items": {"$ref": "#/$defs/OperationDescriptor"}}
+      }
+    },
+    "ReplaceInstancesRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instances"],
+      "properties": {"instances": {"type": "array", "items": {"$ref": "#/$defs/Instance"}}}
+    },
+    "ObservationRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["channel", "key", "revision"],
+      "properties": {
+        "channel": {"$ref": "#/$defs/Identifier"},
+        "key": {"$ref": "#/$defs/Identifier"},
+        "revision": {"type": "integer", "minimum": 1}
+      }
+    },
+    "SessionTrigger": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {"kind": {"const": "launcher"}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "observation"],
+          "properties": {
+            "kind": {"const": "observation"},
+            "observation": {"$ref": "#/$defs/ObservationRef"}
+          }
+        }
+      ]
+    },
+    "SessionStartRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instance", "action", "session_token"],
+      "properties": {
+        "instance": {"$ref": "#/$defs/InstanceRef"},
+        "action": {"$ref": "#/$defs/Identifier"},
+        "payload": {"$ref": "#/$defs/JSONObject"},
+        "session_token": {"$ref": "#/$defs/Identifier"},
+        "trigger": {"$ref": "#/$defs/SessionTrigger"}
+      }
+    },
+    "SessionEndRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instance", "session_token"],
+      "properties": {
+        "instance": {"$ref": "#/$defs/InstanceRef"},
+        "session_token": {"$ref": "#/$defs/Identifier"}
+      }
+    },
+    "AssetRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "package_path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]*$",
+          "allOf": [
+            {"not": {"pattern": "(^|/)\\.{1,2}(/|$)"}},
+            {"not": {"pattern": "//|/$"}}
+          ]
+        },
+        "stock_name": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,54}\\.(image|anim|snd)$"}
+      },
+      "oneOf": [
+        {"required": ["package_path"], "not": {"required": ["stock_name"]}},
+        {"required": ["stock_name"], "not": {"required": ["package_path"]}}
+      ]
+    },
+    "StockAudioRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stock_name"],
+      "properties": {
+        "stock_name": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,54}\\.snd$"}
+      }
+    },
+    "Font": {"enum": ["tiny", "small", "normal", "condensed", "bold", "large", "extra_large", "global"]},
+    "Align": {"enum": ["top_left", "top_mid", "top_right", "mid_left", "center", "mid_right", "bottom_left", "bottom_mid", "bottom_right"]},
+    "Color": {"type": "string", "pattern": "^#[A-Fa-f0-9]{8}$"},
+    "Marquee": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pixels_per_minute"],
+      "properties": {
+        "pixels_per_minute": {"type": "integer", "minimum": 1, "maximum": 4294967295},
+        "start_delay_milliseconds": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+        "repeat_delay_milliseconds": {"type": "integer", "minimum": 0, "maximum": 4294967295}
+      }
+    },
+    "TextElement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "font"],
+      "properties": {
+        "value": {"type": "string", "maxLength": 512},
+        "font": {"$ref": "#/$defs/Font"},
+        "color": {"$ref": "#/$defs/Color"},
+        "align": {"$ref": "#/$defs/Align"},
+        "width": {"type": "integer", "minimum": 1, "maximum": 4294967295},
+        "marquee": {"$ref": "#/$defs/Marquee"}
+      }
+    },
+    "ImageElement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asset"],
+      "properties": {"asset": {"$ref": "#/$defs/AssetRef"}}
+    },
+    "AnimationElement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asset"],
+      "properties": {
+        "asset": {"$ref": "#/$defs/AssetRef"},
+        "loop": {"type": "boolean"}
+      }
+    },
+    "RectangleElement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height", "color"],
+      "properties": {
+        "width": {"type": "integer", "minimum": 1, "maximum": 2147483647},
+        "height": {"type": "integer", "minimum": 1, "maximum": 2147483647},
+        "color": {"$ref": "#/$defs/Color"}
+      }
+    },
+    "CountdownElement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ends_at_unix_seconds", "show_hours", "color"],
+      "properties": {
+        "ends_at_unix_seconds": {"type": "integer", "minimum": 1},
+        "show_hours": {"enum": ["when_non_zero", "always"]},
+        "color": {"$ref": "#/$defs/Color"},
+        "align": {"$ref": "#/$defs/Align"}
+      }
+    },
+    "Element": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "display"],
+      "properties": {
+        "id": {"$ref": "#/$defs/Identifier"},
+        "display": {"enum": ["front", "back"]},
+        "x": {"type": "integer", "minimum": 0, "maximum": 159},
+        "y": {"type": "integer", "minimum": 0, "maximum": 79},
+        "text": {"$ref": "#/$defs/TextElement"},
+        "image": {"$ref": "#/$defs/ImageElement"},
+        "animation": {"$ref": "#/$defs/AnimationElement"},
+        "rectangle": {"$ref": "#/$defs/RectangleElement"},
+        "countdown": {"$ref": "#/$defs/CountdownElement"}
+      },
+      "allOf": [
+        {"if": {"properties": {"display": {"const": "front"}}}, "then": {"properties": {"x": {"maximum": 71}, "y": {"maximum": 15}}}}
+      ],
+      "oneOf": [
+        {"required": ["text"], "not": {"anyOf": [{"required": ["image"]}, {"required": ["animation"]}, {"required": ["rectangle"]}, {"required": ["countdown"]}]}},
+        {"required": ["image"], "not": {"anyOf": [{"required": ["text"]}, {"required": ["animation"]}, {"required": ["rectangle"]}, {"required": ["countdown"]}]}},
+        {"required": ["animation"], "not": {"anyOf": [{"required": ["text"]}, {"required": ["image"]}, {"required": ["rectangle"]}, {"required": ["countdown"]}]}},
+        {"required": ["rectangle"], "not": {"anyOf": [{"required": ["text"]}, {"required": ["image"]}, {"required": ["animation"]}, {"required": ["countdown"]}]}},
+        {"required": ["countdown"], "not": {"anyOf": [{"required": ["text"]}, {"required": ["image"]}, {"required": ["animation"]}, {"required": ["rectangle"]}]}}
+      ]
+    },
+    "Scene": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["elements"],
+      "properties": {"elements": {"type": "array", "minItems": 1, "maxItems": 64, "items": {"$ref": "#/$defs/Element"}}}
+    },
+    "BusyTimer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["theme"],
+      "properties": {"theme": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"}}
+    },
+    "AudioCue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "asset", "expires_at"],
+      "properties": {
+        "id": {"$ref": "#/$defs/Identifier"},
+        "asset": {"$ref": "#/$defs/StockAudioRef"},
+        "expires_at": {"$ref": "#/$defs/Timestamp"}
+      }
+    },
+    "Observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instance", "channel", "key", "revision", "disposition", "impact", "reason_code", "observed_at", "updated_at"],
+      "properties": {
+        "instance": {"$ref": "#/$defs/InstanceRef"},
+        "channel": {"$ref": "#/$defs/Identifier"},
+        "key": {"$ref": "#/$defs/Identifier"},
+        "revision": {"type": "integer", "minimum": 1},
+        "disposition": {"enum": ["snapshot", "notable", "actionable", "resolved"]},
+        "impact": {"enum": ["low", "normal", "notable", "critical"]},
+        "reason_code": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"},
+        "observed_at": {"$ref": "#/$defs/Timestamp"},
+        "updated_at": {"$ref": "#/$defs/Timestamp"},
+        "valid_until": {"$ref": "#/$defs/Timestamp"},
+        "scene": {"$ref": "#/$defs/Scene"},
+        "busy_timer": {"$ref": "#/$defs/BusyTimer"},
+        "audio": {"$ref": "#/$defs/AudioCue"}
+      },
+      "oneOf": [
+        {
+          "required": ["valid_until", "scene"],
+          "properties": {"disposition": {"enum": ["snapshot", "notable", "actionable"]}},
+          "not": {"required": ["busy_timer"]}
+        },
+        {
+          "required": ["valid_until", "busy_timer"],
+          "properties": {"disposition": {"enum": ["snapshot", "notable", "actionable"]}},
+          "not": {"required": ["scene"]}
+        },
+        {
+          "properties": {"disposition": {"const": "resolved"}},
+          "not": {"anyOf": [{"required": ["valid_until"]}, {"required": ["scene"]}, {"required": ["busy_timer"]}, {"required": ["audio"]}]}
+        }
+      ]
+    },
+    "PublishRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["observation"],
+      "properties": {"observation": {"$ref": "#/$defs/Observation"}}
+    },
+    "WithdrawRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instance", "channel", "key"],
+      "properties": {
+        "instance": {"$ref": "#/$defs/InstanceRef"},
+        "channel": {"$ref": "#/$defs/Identifier"},
+        "key": {"$ref": "#/$defs/Identifier"}
+      }
+    },
+    "CheckpointRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instance", "data"],
+      "properties": {
+        "instance": {"$ref": "#/$defs/InstanceRef"},
+        "data": {"$ref": "#/$defs/JSONObject"}
+      }
+    },
+    "CompleteSessionRequest": {"$ref": "#/$defs/SessionEndRequest"},
+    "SessionExecutionRequest": {"$ref": "#/$defs/SessionEndRequest"},
+    "OperationRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instance", "operation"],
+      "properties": {
+        "instance": {"$ref": "#/$defs/InstanceRef"},
+        "operation": {"$ref": "#/$defs/Identifier"},
+        "payload": {"$ref": "#/$defs/JSONObject"}
+      }
+    },
+    "OperationResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["payload"],
+      "properties": {"payload": {"$ref": "#/$defs/JSONObject"}}
+    },
+    "ButtonInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["button", "action"],
+      "properties": {
+        "button": {"enum": ["ok", "back", "start"]},
+        "action": {"enum": ["press", "release"]}
+      }
+    },
+    "EncoderInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["delta"],
+      "properties": {"delta": {"type": "integer", "not": {"const": 0}, "minimum": -2147483648, "maximum": 2147483647}}
+    },
+    "SessionInput": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["button"],
+          "properties": {"button": {"$ref": "#/$defs/ButtonInput"}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["encoder"],
+          "properties": {"encoder": {"$ref": "#/$defs/EncoderInput"}}
+        }
+      ]
+    },
+    "SessionInputRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sequence", "occurred_at", "instance", "session_token", "input"],
+      "properties": {
+        "sequence": {"type": "integer", "minimum": 1},
+        "occurred_at": {"$ref": "#/$defs/Timestamp"},
+        "instance": {"$ref": "#/$defs/InstanceRef"},
+        "session_token": {"$ref": "#/$defs/Identifier"},
+        "input": {"$ref": "#/$defs/SessionInput"}
+      }
+    },
+    "SessionInputResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["disposition"],
+      "properties": {
+        "disposition": {"enum": ["consumed", "not_consumed"]}
+      }
+    },
+    "HealthResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["healthy", "observed_at"],
+      "properties": {
+        "healthy": {"type": "boolean"},
+        "observed_at": {"$ref": "#/$defs/Timestamp"}
+      }
+    },
+    "LogNotification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "event"],
+      "properties": {
+        "level": {"enum": ["debug", "info", "warn", "error"]},
+        "event": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"},
+        "instance": {"$ref": "#/$defs/InstanceRef"},
+        "message": {"type": "string", "maxLength": 1024},
+        "fields": {"type": "object", "maxProperties": 16, "propertyNames": {"pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"}, "additionalProperties": {"type": "string", "maxLength": 256}}
+      }
+    },
+    "MetricNotification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "value"],
+      "properties": {
+        "instance": {"$ref": "#/$defs/InstanceRef"},
+        "name": {"$ref": "#/$defs/Identifier"},
+        "value": {"type": "number"},
+        "unit": {"$ref": "#/$defs/Identifier"}
+      }
+    },
+    "ErrorData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {"kind": {"enum": ["invalid_argument", "not_ready", "generation_conflict", "session_not_active", "session_canceled", "session_generation_mismatch"]}}
+    }
+  }
+}

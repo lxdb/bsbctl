@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "instances": [
+    {"id": "raw-main", "generation": 1, "config": {}}
+  ],
+  "sessions": [
+    {
+      "start": {"instance": {"id": "raw-main", "generation": 1}, "action": "open", "session_token": "raw-session"},
+      "inputs": [{
+        "sequence": 1,
+        "occurred_at": "2026-08-29T12:00:00Z",
+        "instance": {"id": "raw-main", "generation": 1},
+        "session_token": "raw-session",
+        "input": {"button": {"button": "back", "action": "press"}}
+      }],
+      "end": {"instance": {"id": "raw-main", "generation": 1}, "session_token": "raw-session"}
+    }
+  ],
+  "operations": [
+    {"instance": {"id": "raw-main", "generation": 1}, "operation": "inspect", "payload": {}}
+  ]
+}
