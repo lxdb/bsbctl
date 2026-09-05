@@ -40,7 +40,7 @@ The [release workflow](../.github/workflows/release.yml) is manually dispatched.
 4. Obtain the required `release` environment approval.
 5. Dispatch with `catalog_sequence`, `catalog_generated_at`, and `catalog_key_id`.
 
-Repository administrators must protect release tag creation and updates. The workflow never creates or moves tags. It accepts lightweight or annotated tags and does not verify GPG or SSH tag signatures.
+Repository administrators must enforce protected tag creation and update controls for release tags. The workflow never creates or moves tags. It accepts lightweight or annotated tags and does not verify GPG or SSH tag signatures.
 
 Only the publish job has write permission. It uses artifacts from its own workflow run, reinspects both architectures, signs and verifies the catalog, then publishes the four plugin releases before core.
 
