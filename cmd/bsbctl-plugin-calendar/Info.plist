@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleIdentifier</key>
+	<string>dev.bsbctl.calendar</string>
+	<key>CFBundleName</key>
+	<string>bsbctl Calendar</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>bsbctl reads local Calendar events to show upcoming meetings on your BUSY Bar.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>bsbctl reads local Calendar events to show upcoming meetings on your BUSY Bar.</string>
+</dict>
+</plist>

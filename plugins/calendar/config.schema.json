@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "calendarKey": {
+      "type": "string",
+      "pattern": "^calendar-[0-9a-f]{64}$"
+    },
+    "leadMinutes": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 60
+    },
+    "activeDisplay": {
+      "type": "string",
+      "enum": ["event_name", "theme"]
+    },
+    "theme": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+    }
+  },
+  "type": "object",
+  "properties": {
+    "reminder_enabled": {"type": "boolean", "default": true},
+    "reminder_lead_minutes": {"$ref": "#/$defs/leadMinutes", "default": 5},
+    "reminder_sound": {"type": "boolean", "default": true},
+    "reminder_show_event_name": {"type": "boolean", "default": true},
+    "active_enabled": {"type": "boolean", "default": true},
+    "active_sound": {"type": "boolean", "default": true},
+    "active_display": {"$ref": "#/$defs/activeDisplay", "default": "event_name"},
+    "active_theme": {"$ref": "#/$defs/theme", "default": "meeting"},
+    "calendars": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "properties": {
+          "key": {"$ref": "#/$defs/calendarKey"},
+          "enabled": {"type": "boolean"},
+          "reminder_enabled": {"type": "boolean"},
+          "reminder_lead_minutes": {"$ref": "#/$defs/leadMinutes"},
+          "reminder_sound": {"type": "boolean"},
+          "reminder_show_event_name": {"type": "boolean"},
+          "active_enabled": {"type": "boolean"},
+          "active_sound": {"type": "boolean"},
+          "active_display": {"$ref": "#/$defs/activeDisplay"},
+          "active_theme": {"$ref": "#/$defs/theme"}
+        },
+        "required": ["key"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

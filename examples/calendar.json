@@ -1,0 +1,18 @@
+{
+    "config": {},
+    "policies": {
+        "upcoming": {
+            "policy": "when_relevant",
+            "device_priority": 100,
+            "activation_action": "calendar_event_options"
+        },
+        "active": {
+            "policy": "when_relevant",
+            "device_priority": 100,
+            "activation_action": "calendar_event_options"
+        },
+        "interaction": {
+            "policy": "interactive"
+        }
+    }
+}
