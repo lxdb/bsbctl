@@ -112,7 +112,7 @@ Without `--capture`, the generator never contacts a BUSY Bar or reads local prov
 
 Mock only provider inputs, timestamps, and user-safe labels. Build every preview through the plugin's production reducer, interaction, and scene-building paths. Do not hand-author a preview-only scene or duplicate production display text; a preview must match what the downloaded plugin publishes for the same inputs.
 
-After a captured production-scene change, explicitly render the mock-only Calendar, Codex, Codex Quota, and GitHub Notifications scenes through the configured BUSY Bar, refresh their reviewed fixtures and checksums, and regenerate every publishable preview output. Mac Resources retains its reviewed framebuffer fixture:
+After a captured production-scene change, explicitly render the mock-only Calendar, Codex, Codex Quota, GitHub Notifications, and Slack scenes through the configured BUSY Bar, refresh their reviewed fixtures and checksums, and regenerate every publishable preview output. Mac Resources retains its reviewed framebuffer fixture:
 
 ```bash
 go run -tags preview ./cmd/previewgen --capture

@@ -91,6 +91,7 @@ func TestAppGuidesCoverConfigurationSchemas(t *testing.T) {
 		"plugins/codexquota/config.schema.json":          "codex-quota.md",
 		"plugins/githubnotifications/config.schema.json": "github-notifications.md",
 		"plugins/macresources/config.schema.json":        "mac-resources.md",
+		"plugins/slack/config.schema.json":               "slack.md",
 	}
 	for schemaPath, guidePath := range guides {
 		schemaData := readFile(t, "../"+schemaPath)

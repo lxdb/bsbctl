@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "instances": [{"id": "slack", "generation": 1, "config": {}}],
+  "sessions": [{
+    "start": {
+      "instance": {"id": "slack", "generation": 1},
+      "action": "open",
+      "session_token": "slack-session",
+      "trigger": {"kind": "launcher"}
+    },
+    "inputs": [{
+      "sequence": 1,
+      "occurred_at": "2026-09-05T12:00:00Z",
+      "instance": {"id": "slack", "generation": 1},
+      "session_token": "slack-session",
+      "input": {"button": {"button": "back", "action": "press"}}
+    }],
+    "end": {"instance": {"id": "slack", "generation": 1}, "session_token": "slack-session"}
+  }],
+  "operations": [
+    {"instance": {"id": "slack", "generation": 1}, "operation": "status", "payload": {}},
+    {"instance": {"id": "slack", "generation": 1}, "operation": "items", "payload": {"limit": 1}}
+  ]
+}

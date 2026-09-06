@@ -17,6 +17,7 @@ import (
 	"github.com/lxdb/bsbctl/plugins/codexquota"
 	"github.com/lxdb/bsbctl/plugins/githubnotifications"
 	"github.com/lxdb/bsbctl/plugins/macresources"
+	"github.com/lxdb/bsbctl/plugins/slack"
 	pluginsdk "github.com/lxdb/bsbctl/sdk/plugin"
 )
 
@@ -129,6 +130,22 @@ var descriptors = []Descriptor{
 				macresources.ChannelSummary:  {Policy: presentation.PolicyRotation, RotationIntervalMS: 60_000, RotationJitterPercent: 10},
 				macresources.ChannelPressure: {Policy: presentation.PolicyWhenRelevant},
 				macresources.ChannelLive:     {Policy: presentation.PolicyInteractive},
+			},
+		},
+	},
+	{
+		ID: slack.PluginID, DevelopmentVersion: "0.1.0", DisplayName: "Slack", Binary: "bsbctl-plugin-slack",
+		Description: "Show pending Slack DMs, channel messages, mentions, and watched threads.", Requirement: "User-created internal Slack app",
+		CommandPackage: "./cmd/bsbctl-plugin-slack", TagPrefix: "plugin/slack/v", ReleaseTitle: "Slack plugin",
+		DefinitionForVersion: slack.DefinitionForVersion, SchemaPath: "plugins/slack/config.schema.json",
+		AssetRoot: "plugins/slack", Assets: slack.AssetDeclarations(),
+		FixturePath: "docs/protocol/v1/fixtures/plugins/slack.json", SoakProfile: "synthetic-resident-data-sources",
+		DefaultApp: config.App{
+			ID: "slack", PluginID: slack.PluginID, Enabled: true, Config: []byte(`{}`), LaunchAction: "open",
+			Policies: map[string]presentation.PolicyConfig{
+				slack.ChannelAttention:  {Policy: presentation.PolicyAttention, RequiresAck: true, ActivationAction: "open", ActivationInput: "start_or_encoder"},
+				slack.ChannelConnection: {Policy: presentation.PolicyWhenRelevant, ActivationAction: "open"},
+				slack.ChannelLive:       {Policy: presentation.PolicyInteractive},
 			},
 		},
 	},

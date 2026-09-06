@@ -326,6 +326,7 @@ func TestSetupInstallsEveryExplicitlySelectedAppFromOneCatalog(t *testing.T) {
 
 	installed := make(map[string]string)
 	apps := make(map[string]string)
+	createRequests := make(map[string]control.CreateAppRequest)
 	client := &fakeCLIClient{call: func(_ context.Context, method string, params, result any) error {
 		switch method {
 		case "daemon.status":
@@ -346,6 +347,7 @@ func TestSetupInstallsEveryExplicitlySelectedAppFromOneCatalog(t *testing.T) {
 			*(result.(*control.CatalogOperationResponse)) = control.CatalogOperationResponse{Result: installer.Result{Status: installer.StatusInstalled, Release: installer.ReleaseRef{ID: request.PluginID, Version: request.Version, OS: request.OS, Arch: request.Arch}}}
 		case "app.create":
 			request := params.(control.CreateAppRequest)
+			createRequests[request.AppID] = request
 			apps[request.AppID] = request.PluginID
 			*(result.(*control.AppInstanceResult)) = control.AppInstanceResult{Status: control.MutationCreated, AppID: request.AppID, PluginID: request.PluginID, Enabled: true, Generation: uint64(len(apps) + 1)}
 		default:
@@ -357,7 +359,7 @@ func TestSetupInstallsEveryExplicitlySelectedAppFromOneCatalog(t *testing.T) {
 	defer restoreClient()
 
 	var stdout, stderr bytes.Buffer
-	code := execute(t.Context(), []string{"setup", "--apps", "mac-resources,codex-quota"}, strings.NewReader(""), &stdout, &stderr)
+	code := execute(t.Context(), []string{"setup", "--apps", "mac-resources,codex-quota,slack"}, strings.NewReader(""), &stdout, &stderr)
 	if code != exitSuccess || stderr.Len() != 0 {
 		t.Fatalf("setup = code %d stdout %q stderr %q", code, stdout.String(), stderr.String())
 	}
@@ -365,13 +367,25 @@ func TestSetupInstallsEveryExplicitlySelectedAppFromOneCatalog(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 		t.Fatal(err)
 	}
-	if result.Status != "configured" || result.Version != "1.2.3" || len(result.Apps) != 2 || result.Apps[0].AppID != "mac-resources" || result.Apps[1].AppID != "codex-quota" {
+	if result.Status != "configured" || result.Version != "1.2.3" || len(result.Apps) != 3 || result.Apps[0].AppID != "mac-resources" || result.Apps[1].AppID != "codex-quota" || result.Apps[2].AppID != "slack" {
 		t.Fatalf("setup result = %#v", result)
 	}
 	for _, app := range result.Apps {
 		if app.PluginStatus != "installed" || app.AppStatus != "created" || installed[app.PluginID] != "1.2.3" || apps[app.AppID] != app.PluginID {
 			t.Fatalf("setup app = %#v installed=%v apps=%v", app, installed, apps)
 		}
+	}
+	slackDescriptor, ok := firstpartyplugins.LookupAppID("slack")
+	if !ok {
+		t.Fatal("Slack descriptor not found")
+	}
+	app := slackDescriptor.DefaultApp
+	wantSlack := control.CreateAppRequest{
+		AppID: app.ID, PluginID: app.PluginID, Enabled: app.Enabled, Config: app.Config,
+		Secrets: app.Secrets, Policies: app.Policies, LaunchAction: app.LaunchAction,
+	}
+	if !reflect.DeepEqual(createRequests["slack"], wantSlack) {
+		t.Fatalf("Slack setup create request = %#v, want %#v", createRequests["slack"], wantSlack)
 	}
 }
 

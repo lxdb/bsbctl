@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "label": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "pattern": "^[ -~]*[!-~][ -~]*$"
+    },
+    "channel": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[CG][A-Z0-9]{1,63}$"
+        },
+        "alias": {
+          "$ref": "#/$defs/label"
+        }
+      },
+      "required": [
+        "id",
+        "alias"
+      ],
+      "additionalProperties": false
+    },
+    "threadRoot": {
+      "type": "object",
+      "properties": {
+        "channel_id": {
+          "type": "string",
+          "pattern": "^[CDG][A-Z0-9]{1,63}$"
+        },
+        "thread_ts": {
+          "type": "string",
+          "pattern": "^[0-9]{1,16}\\.[0-9]{6}$"
+        }
+      },
+      "required": [
+        "channel_id",
+        "thread_ts"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "properties": {
+    "app_id": {
+      "type": "string",
+      "pattern": "^A[A-Z0-9]{1,63}$"
+    },
+    "workspace_id": {
+      "type": "string",
+      "pattern": "^T[A-Z0-9]{1,63}$"
+    },
+    "user_id": {
+      "type": "string",
+      "pattern": "^[UW][A-Z0-9]{1,63}$"
+    },
+    "channels": {
+      "type": "array",
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/channel"
+      },
+      "default": []
+    },
+    "all_channels": {
+      "type": "boolean",
+      "default": false
+    },
+    "direct_messages": {
+      "type": "boolean",
+      "default": true
+    },
+    "group_direct_messages": {
+      "type": "boolean",
+      "default": false
+    },
+    "watched_threads": {
+      "type": "array",
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/threadRoot"
+      },
+      "default": []
+    },
+    "watch_participated_threads": {
+      "type": "boolean",
+      "default": true
+    },
+    "label": {
+      "$ref": "#/$defs/label",
+      "default": "SLK"
+    },
+    "rear_details": {
+      "type": "boolean",
+      "default": false
+    },
+    "front_message_preview": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "anyOf": [
+    {
+      "maxProperties": 0
+    },
+    {
+      "required": [
+        "app_id",
+        "workspace_id",
+        "user_id"
+      ]
+    }
+  ],
+  "additionalProperties": false
+}

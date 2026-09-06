@@ -10,6 +10,8 @@ import (
 	"github.com/lxdb/bsbctl/plugins/codexquota"
 	"github.com/lxdb/bsbctl/plugins/githubnotifications"
 	"github.com/lxdb/bsbctl/plugins/macresources"
+	"github.com/lxdb/bsbctl/plugins/slack"
+	pluginsdk "github.com/lxdb/bsbctl/sdk/plugin"
 	"github.com/lxdb/bsbctl/sdk/protocol"
 )
 
@@ -35,6 +37,7 @@ func TestRegistryOwnsEveryFirstPartyPluginIdentity(t *testing.T) {
 		"dev.bsbctl.codex-quota",
 		"dev.bsbctl.github-notifications",
 		"dev.bsbctl.mac-resources",
+		"dev.bsbctl.slack",
 	}
 	wantBinaries := []string{
 		"bsbctl-plugin-calendar",
@@ -42,8 +45,9 @@ func TestRegistryOwnsEveryFirstPartyPluginIdentity(t *testing.T) {
 		"bsbctl-plugin-codex-quota",
 		"bsbctl-plugin-github-notifications",
 		"bsbctl-plugin-mac-resources",
+		"bsbctl-plugin-slack",
 	}
-	wantAppIDs := []string{"calendar", "codex", "codex-quota", "github-notifications", "mac-resources"}
+	wantAppIDs := []string{"calendar", "codex", "codex-quota", "github-notifications", "mac-resources", "slack"}
 	descriptors := All()
 	ids := make([]string, len(descriptors))
 	binaries := make([]string, len(descriptors))
@@ -126,6 +130,41 @@ func TestGitHubNotificationsDefaultUsesExactDeliveryPolicies(t *testing.T) {
 	}
 	if !reflect.DeepEqual(descriptor.DefaultApp.Policies, want) {
 		t.Fatalf("GitHub Notifications policies = %#v, want %#v", descriptor.DefaultApp.Policies, want)
+	}
+}
+
+func TestSlackDefaultIsStrictlyUnconfiguredWithCompletePolicies(t *testing.T) {
+	t.Parallel()
+	descriptor, ok := LookupID(slack.PluginID)
+	if !ok {
+		t.Fatal("Slack descriptor not found")
+	}
+	if string(descriptor.DefaultApp.Config) != `{}` || len(descriptor.DefaultApp.Secrets) != 0 || descriptor.DefaultApp.LaunchAction != "open" {
+		t.Fatalf("Slack default app = %#v", descriptor.DefaultApp)
+	}
+	want := map[string]presentation.PolicyConfig{
+		slack.ChannelAttention:  {Policy: presentation.PolicyAttention, RequiresAck: true, ActivationAction: "open", ActivationInput: "start_or_encoder"},
+		slack.ChannelConnection: {Policy: presentation.PolicyWhenRelevant, ActivationAction: "open"},
+		slack.ChannelLive:       {Policy: presentation.PolicyInteractive},
+	}
+	if !reflect.DeepEqual(descriptor.DefaultApp.Policies, want) {
+		t.Fatalf("Slack default policies = %#v, want %#v", descriptor.DefaultApp.Policies, want)
+	}
+	wantContract := pluginsdk.Contract{
+		ExecutionModes: []protocol.ExecutionMode{protocol.ExecutionModeResident, protocol.ExecutionModeInteractive},
+		Channels: []protocol.Channel{
+			{ID: slack.ChannelSummary},
+			{ID: slack.ChannelAttention},
+			{ID: slack.ChannelConnection},
+			{ID: slack.ChannelLive},
+		},
+		Operations: []protocol.OperationDescriptor{
+			{ID: "status", Kind: protocol.OperationQuery},
+			{ID: "items", Kind: protocol.OperationQuery},
+		},
+	}
+	if got := descriptor.DefinitionForVersion("0.1.0").Contract; !reflect.DeepEqual(got, wantContract) {
+		t.Fatalf("Slack manifest contract = %#v, want %#v", got, wantContract)
 	}
 }
 

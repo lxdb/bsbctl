@@ -19,3 +19,7 @@ Release archives include this notice and the complete `LICENSES/` directory. The
 ## GitHub identity asset
 
 `plugins/githubnotifications/assets/github-mark.png` is a 16x16 raster canvas with the official white GitHub Invertocat supplied in the local GitHub logo package centered at 14x14. The mark retains its original proportions and colors. GitHub owns its trademarks; this asset identifies the integration and does not imply endorsement. It is not covered by this repository's code license.
+
+## Slack mark
+
+`plugins/slack/assets/slack-mark.png` is a 16-pixel raster of the official Slack mark supplied for this project. Slack and the Slack logo are trademarks of Slack Technologies, LLC. The mark identifies the Slack integration and does not imply endorsement.

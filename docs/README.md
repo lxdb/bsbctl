@@ -10,7 +10,7 @@
 | Manage or troubleshoot the service | [Operations](operations.md) |
 | Find commands or error meanings | [CLI reference](reference/cli.md), [exit codes](reference/errors.md) |
 
-App guides: [Calendar](calendar.md), [Codex](codex-app-server.md), [Codex Quota](codex-quota.md), [GitHub Notifications](github-notifications.md), and [Mac Resources](mac-resources.md).
+App guides: [Calendar](calendar.md), [Codex](codex-app-server.md), [Codex Quota](codex-quota.md), [GitHub Notifications](github-notifications.md), [Mac Resources](mac-resources.md), and [Slack](slack.md).
 
 ## Build a plugin
 

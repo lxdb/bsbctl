@@ -1,0 +1,36 @@
+{
+  "config": {
+    "app_id": "A01234567",
+    "workspace_id": "T01234567",
+    "user_id": "U01234567",
+    "all_channels": true,
+    "channels": [],
+    "direct_messages": true,
+    "group_direct_messages": true,
+    "watched_threads": [],
+    "watch_participated_threads": true,
+    "label": "SLK",
+    "rear_details": false,
+    "front_message_preview": false
+  },
+  "secrets": {
+    "app_token": "keychain://bsbctl/slack-app-token",
+    "user_token": "keychain://bsbctl/slack-user-token"
+  },
+  "policies": {
+    "attention": {
+      "policy": "attention",
+      "requires_ack": true,
+      "activation_input": "start_or_encoder",
+      "activation_action": "open"
+    },
+    "connection": {
+      "policy": "when_relevant",
+      "activation_action": "open"
+    },
+    "live": {
+      "policy": "interactive"
+    }
+  },
+  "launch_action": "open"
+}

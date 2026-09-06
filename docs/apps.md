@@ -9,6 +9,7 @@ Choose an app, then follow its guide for setup and settings.
 | Codex Quota | `codex-quota` | `dev.bsbctl.codex-quota` | Codex usage and reset windows | Authenticated Codex profile | [Codex Quota](codex-quota.md) |
 | GitHub Notifications | `github-notifications` | `dev.bsbctl.github-notifications` | Unread notifications from selected GitHub.com repositories | Classic GitHub token with notifications or repo scope | [GitHub Notifications](github-notifications.md) |
 | Mac Resources | `mac-resources` | `dev.bsbctl.mac-resources` | CPU, memory, and network pressure | No external account | [Mac Resources](mac-resources.md) |
+| Slack | `slack` | `dev.bsbctl.slack` | Pending DMs, channel messages, mentions, and watched threads | User-created internal Slack app | [Slack](slack.md) |
 
 ## Install and manage
 
@@ -50,6 +51,8 @@ A query reads state; a command can change it.
 | Codex | Command | `unpin` | `bsbctl app command codex unpin --file request.json` |
 | GitHub Notifications | Query | `status` | `bsbctl app query github-notifications status` |
 | GitHub Notifications | Query | `items` | `bsbctl app query github-notifications items --file request.json` |
+| Slack | Query | `status` | `bsbctl app query slack status` |
+| Slack | Query | `items` | `bsbctl app query slack items --file request.json` |
 
 Use `--file -` to read a JSON request from standard input. See the app guide for request contents.
 

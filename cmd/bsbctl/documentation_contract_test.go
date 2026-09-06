@@ -40,6 +40,7 @@ func TestDocumentationAppConfigurationExamplesDecode(t *testing.T) {
 		"../../docs/codex-app-server.md": "codex",
 		"../../docs/codex-quota.md":      "codex-quota",
 		"../../docs/mac-resources.md":    "mac-resources",
+		"../../docs/slack.md":            "slack",
 	}
 	for path, appID := range guides {
 		data, err := os.ReadFile(path)
