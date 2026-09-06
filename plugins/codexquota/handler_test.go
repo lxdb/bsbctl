@@ -405,7 +405,7 @@ func TestHandlerPublishesIndependentMultiAccountSummaryAndPressure(t *testing.T)
 	if values[0].Instance.ID != "main" || values[0].Channel != ChannelSummary || values[0].Disposition != protocol.DispositionNotable {
 		t.Fatalf("main summary = %#v", values[0])
 	}
-	if values[1].Instance.ID != "work" || values[1].Channel != ChannelPressure || values[1].Disposition != protocol.DispositionNotable || values[1].Impact != protocol.ImpactNotable {
+	if values[1].Instance.ID != "work" || values[1].Channel != ChannelPressure || values[1].Disposition != protocol.DispositionNotable || values[1].Impact != protocol.ImpactLow {
 		t.Fatalf("work pressure = %#v", values[1])
 	}
 	if values[2].Instance.ID != "work" || values[2].Channel != ChannelSummary {
@@ -440,6 +440,47 @@ func TestHandlerCriticalRecoveryResolvesPressure(t *testing.T) {
 	resolved := host.next(t)
 	if resolved.Disposition != protocol.DispositionResolved || resolved.ReasonCode != "codex_quota_recovered" || resolved.Scene != nil {
 		t.Fatalf("resolved = %#v", resolved)
+	}
+}
+
+func TestWorkerPressurePublishesOnlyOnSignalChange(t *testing.T) {
+	now := time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
+	host := &recordingQuotaHost{observations: make(chan protocol.Observation, 8)}
+	worker := &accountWorker{
+		instanceID: "main", config: defaultConfig("/tmp/codex"), host: host, now: func() time.Time { return now },
+	}
+	low := Snapshot{UpdatedAt: now, Windows: []Window{{Duration: 5 * time.Hour, RemainingPercent: 15, ResetsAt: now.Add(time.Hour)}}}
+	if err := worker.publishResident(t.Context(), low, now); err != nil {
+		t.Fatal(err)
+	}
+	_ = host.next(t)
+	pressure := host.next(t)
+	if pressure.Channel != ChannelPressure || pressure.Impact != protocol.ImpactLow || !pressure.ValidUntil.Equal(now.Add(30*time.Second)) {
+		t.Fatalf("initial low pressure = %#v", pressure)
+	}
+
+	now = now.Add(time.Minute)
+	low.UpdatedAt = now
+	low.Windows[0].RemainingPercent = 14
+	if err := worker.publishResident(t.Context(), low, now); err != nil {
+		t.Fatal(err)
+	}
+	if summary := host.next(t); summary.Channel != ChannelSummary {
+		t.Fatalf("unchanged low publication = %#v", summary)
+	}
+	if len(host.observations) != 0 {
+		t.Fatal("unchanged low signal republished pressure")
+	}
+
+	critical := low
+	critical.Windows = []Window{{Duration: 5 * time.Hour, RemainingPercent: 5, ResetsAt: now.Add(time.Hour)}}
+	if err := worker.publishResident(t.Context(), critical, now); err != nil {
+		t.Fatal(err)
+	}
+	_ = host.next(t)
+	pressure = host.next(t)
+	if pressure.Channel != ChannelPressure || pressure.Disposition != protocol.DispositionActionable || pressure.Impact != protocol.ImpactCritical {
+		t.Fatalf("critical transition = %#v", pressure)
 	}
 }
 

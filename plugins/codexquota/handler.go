@@ -53,6 +53,7 @@ type accountWorker struct {
 	pressureRevision     uint64
 	summaryActive        map[string]struct{}
 	pressureActive       bool
+	pressureSignal       signalDisposition
 	failureActive        bool
 	retryAttempt         int
 	healthMu             sync.RWMutex
@@ -350,13 +351,17 @@ func (w *accountWorker) publishResident(ctx context.Context, snapshot Snapshot, 
 			return err
 		}
 		w.pressureActive = false
+		w.pressureSignal = signalNone
+		return nil
+	}
+	if w.pressureActive && signal == w.pressureSignal {
 		return nil
 	}
 	w.pressureRevision++
 	value := protocol.Observation{
 		Instance: protocol.InstanceRef{ID: w.instanceID, Generation: w.generation}, Channel: ChannelPressure, Key: observationKey, Revision: w.pressureRevision,
-		Disposition: protocol.DispositionNotable, Impact: protocol.ImpactNotable, ReasonCode: "codex_quota_low",
-		ObservedAt: now.UTC(), UpdatedAt: now.UTC(), ValidUntil: validUntil,
+		Disposition: protocol.DispositionNotable, Impact: protocol.ImpactLow, ReasonCode: "codex_quota_low",
+		ObservedAt: now.UTC(), UpdatedAt: now.UTC(), ValidUntil: now.Add(30 * time.Second).UTC(),
 		Scene: new(quotaScene(snapshot, mostConstrainedWindow(snapshot), config, signal)),
 	}
 	if signal == signalCritical {
@@ -368,6 +373,7 @@ func (w *accountWorker) publishResident(ctx context.Context, snapshot Snapshot, 
 		return err
 	}
 	w.pressureActive = true
+	w.pressureSignal = signal
 	return nil
 }
 

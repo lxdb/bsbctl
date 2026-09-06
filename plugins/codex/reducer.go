@@ -22,19 +22,21 @@ const (
 )
 
 type Reducer struct {
-	now               func() time.Time
-	connected         bool
-	connection        appserver.Connection
-	disconnectedAt    time.Time
-	awaitingReconcile bool
-	pending           map[string]*pendingRequest
-	threads           map[string]*threadState
-	pinned            string
-	quotaOptions      QuotaOptions
-	quota             *codexusage.Snapshot
-	rateLimits        appserver.RateLimitSnapshot
-	liveSequence      uint64
-	requestSequence   uint64
+	now                func() time.Time
+	connected          bool
+	connection         appserver.Connection
+	disconnectedAt     time.Time
+	awaitingReconcile  bool
+	pending            map[string]*pendingRequest
+	threads            map[string]*threadState
+	pinned             string
+	quotaOptions       QuotaOptions
+	quota              *codexusage.Snapshot
+	quotaSignal        codexusage.Signal
+	quotaPressureUntil time.Time
+	rateLimits         appserver.RateLimitSnapshot
+	liveSequence       uint64
+	requestSequence    uint64
 }
 
 type QuotaOptions struct {
@@ -76,6 +78,8 @@ func (r *Reducer) Apply(event appserver.ManagerEvent) {
 			thread.Status.ActiveFlags = nil
 		}
 		r.quota = nil
+		r.quotaSignal = codexusage.SignalNone
+		r.quotaPressureUntil = time.Time{}
 		r.rateLimits = appserver.RateLimitSnapshot{}
 	case appserver.ManagerRateLimitsSnapshot:
 		if r.quotaOptions.Enabled && event.RateLimits != nil {
@@ -142,6 +146,11 @@ func (r *Reducer) applyRateLimits(snapshot appserver.RateLimitSnapshot) {
 		return
 	}
 	r.rateLimits = appserver.MergeRateLimits(r.rateLimits, snapshot)
+	nextSignal := codexusage.SignalFor(normalized, r.quotaOptions.Presentation)
+	if nextSignal != r.quotaSignal {
+		r.quotaPressureUntil = r.now().UTC().Add(quotaPressureVisibilityWindow)
+	}
+	r.quotaSignal = nextSignal
 	r.quota = &normalized
 }
 

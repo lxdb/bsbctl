@@ -1,6 +1,6 @@
 # Codex Quota
 
-Codex Quota shows remaining usage, reset time, and low-quota warnings for authenticated local Codex profiles. It does not require the interactive Codex app-server integration.
+Codex Quota shows remaining usage, reset time, and quota threshold changes for authenticated local Codex profiles. It does not require the interactive Codex app-server integration.
 
 ## Install
 
@@ -71,4 +71,6 @@ The plugin reads the access token and optional account ID from `auth.json`. It s
 
 If a read fails, the plugin reports degraded health and lets stale observations expire. It does not report zero usage. Credentials, full home paths, and provider bodies are excluded from displays and diagnostics. Data is not sent to bsbctl services.
 
-The [Codex app](codex-app-server.md#optional-quota) can also show quota. Both providers can remain installed.
+The summary participates in rotation every five minutes by default. A transition into low or critical quota publishes a 30-second pressure episode; unchanged pressure does not remain continuously eligible or renew at every poll. Critical pressure uses critical impact. Other active app events therefore resume after the bounded episode, while actionable notifications remain in a higher priority band.
+
+The [Codex app](codex-app-server.md#optional-quota) can also show quota. Both providers can remain enabled. This supports installations without app-server, one-account app-server installations, and installations where app-server remains linked to one account while the standalone app follows a different active `auth.json` profile. When both providers represent the same account, their bounded threshold episodes and periodic summaries may overlap.
