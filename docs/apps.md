@@ -7,6 +7,7 @@ Choose an app, then follow its guide for setup and settings.
 | Calendar | `calendar` | `dev.bsbctl.calendar` | Upcoming and active Apple Calendar events | Full Calendar access on macOS 14 or later | [Calendar](calendar.md) |
 | Codex | `codex` | `dev.bsbctl.codex` | Live Codex activity and device approvals | Codex CLI app-server | [Codex](codex-app-server.md) |
 | Codex Quota | `codex-quota` | `dev.bsbctl.codex-quota` | Codex usage and reset windows | Authenticated Codex profile | [Codex Quota](codex-quota.md) |
+| GitHub Notifications | `github-notifications` | `dev.bsbctl.github-notifications` | Unread notifications from selected GitHub.com repositories | Classic GitHub token with notifications or repo scope | [GitHub Notifications](github-notifications.md) |
 | Mac Resources | `mac-resources` | `dev.bsbctl.mac-resources` | CPU, memory, and network pressure | No external account | [Mac Resources](mac-resources.md) |
 
 ## Install and manage
@@ -47,6 +48,8 @@ A query reads state; a command can change it.
 | Codex | Query | `sessions` | `bsbctl app query codex sessions` |
 | Codex | Command | `pin` | `bsbctl app command codex pin --file request.json` |
 | Codex | Command | `unpin` | `bsbctl app command codex unpin --file request.json` |
+| GitHub Notifications | Query | `status` | `bsbctl app query github-notifications status` |
+| GitHub Notifications | Query | `items` | `bsbctl app query github-notifications items --file request.json` |
 
 Use `--file -` to read a JSON request from standard input. See the app guide for request contents.
 

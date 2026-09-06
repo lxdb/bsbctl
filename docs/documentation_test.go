@@ -86,10 +86,11 @@ func TestBuiltInAppDocumentationMatchesRegistry(t *testing.T) {
 
 func TestAppGuidesCoverConfigurationSchemas(t *testing.T) {
 	guides := map[string]string{
-		"plugins/calendar/config.schema.json":     "calendar.md",
-		"plugins/codex/config.schema.json":        "codex-app-server.md",
-		"plugins/codexquota/config.schema.json":   "codex-quota.md",
-		"plugins/macresources/config.schema.json": "mac-resources.md",
+		"plugins/calendar/config.schema.json":            "calendar.md",
+		"plugins/codex/config.schema.json":               "codex-app-server.md",
+		"plugins/codexquota/config.schema.json":          "codex-quota.md",
+		"plugins/githubnotifications/config.schema.json": "github-notifications.md",
+		"plugins/macresources/config.schema.json":        "mac-resources.md",
 	}
 	for schemaPath, guidePath := range guides {
 		schemaData := readFile(t, "../"+schemaPath)

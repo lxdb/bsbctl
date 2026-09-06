@@ -37,7 +37,7 @@ bsbctl plugin rollback <plugin-id> [--version VERSION] [--socket PATH]
 bsbctl plugin verify --manifest PATH --fixture PATH [--executable PATH]
 ```
 
-`PATH|-` means a file path or standard input. Configuration commands accept a complete JSON object, not a partial patch. See [Apps](../apps.md) and [Plugin packaging](../plugin-packaging.md).
+`PATH|-` means a file path or standard input. Configuration commands accept a complete JSON object, not a partial patch. `app setup` supports installed GitHub Notifications instances and requires a real configuration file when `--token-stdin` reads a token from standard input. See [Apps](../apps.md), [GitHub Notifications](../github-notifications.md), and [Plugin packaging](../plugin-packaging.md).
 
 ## Attention
 

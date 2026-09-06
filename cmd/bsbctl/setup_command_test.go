@@ -46,7 +46,7 @@ func TestSetupRequiresTerminalWithoutExplicitApps(t *testing.T) {
 
 func TestSetupPromptsForEveryAvailableAppWithNoDefaultSelection(t *testing.T) {
 	var output bytes.Buffer
-	selected, err := promptSetupApps(strings.NewReader("\n\n\n\n"), &output)
+	selected, err := promptSetupApps(strings.NewReader(strings.Repeat("\n", len(firstpartyplugins.All()))), &output)
 	if err != nil || len(selected) != 0 {
 		t.Fatalf("prompt selection = %#v, error %v", selected, err)
 	}
