@@ -508,7 +508,7 @@ func normalizedArchivePath(name string, directory bool) (string, error) {
 	} else if strings.HasSuffix(normalized, "/") {
 		return "", errors.New("unsafe archive path")
 	}
-	if len(normalized) > maxArchivePathBytes || normalized == "" || normalized == "." || normalized == ".." || path.Clean(normalized) != normalized || strings.HasPrefix(normalized, "../") {
+	if len(normalized) > maxArchivePathBytes || normalized == "" || normalized == "." || normalized == ".." || !filepath.IsLocal(normalized) || path.Clean(normalized) != normalized || strings.HasPrefix(normalized, "../") {
 		return "", errors.New("unsafe archive path")
 	}
 	return normalized, nil

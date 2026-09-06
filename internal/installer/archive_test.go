@@ -154,6 +154,19 @@ func TestNormalizedArchivePathAppliesLimitAfterDirectoryNormalization(t *testing
 	}
 }
 
+func TestNormalizedArchivePathRejectsNonLocalAndNonCanonicalNames(t *testing.T) {
+	for _, name := range []string{".", "..", "../escape", "dir/../../escape", "./file", "dir//file", "//absolute"} {
+		if _, err := normalizedArchivePath(name, false); err == nil {
+			t.Errorf("unsafe archive path %q was accepted", name)
+		}
+	}
+	for _, name := range []string{"C:/literal", "%2e%2e/encoded", "dir/\u2215/file"} {
+		if got, err := normalizedArchivePath(name, false); err != nil || got != name {
+			t.Errorf("local literal path %q = %q, %v", name, got, err)
+		}
+	}
+}
+
 func TestArchivePathFoldCollidesUnicodeCaseEquivalents(t *testing.T) {
 	capitalSigma := foldArchivePath("assets/\u03a3.anim")
 	finalSigma := foldArchivePath("assets/\u03c2.anim")
