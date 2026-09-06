@@ -3,6 +3,7 @@ package device
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -173,6 +174,32 @@ func TestGatewayConflictThroughOutputDoesNotReportDeviceFailure(t *testing.T) {
 	}
 	if got := output.Status().LastErrorCode; got != "" {
 		t.Fatalf("output status error = %q, want no device failure for native arbitration", got)
+	}
+}
+
+func TestGatewayClearsAfterCanceledDrawMayReachDevice(t *testing.T) {
+	backend := &cancelAfterDrawBackend{started: make(chan struct{}), release: make(chan struct{}), completed: make(chan struct{})}
+	output := NewOutput(backend, OutputOptions{CallTimeout: time.Second})
+	defer func() { _ = output.Close(context.Background()) }()
+	gateway := newTestGateway(output)
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan error, 1)
+	go func() {
+		_, err := gateway.Render(ctx, new(candidate(60, "ambiguous")))
+		done <- err
+	}()
+	<-backend.started
+	cancel()
+	if err := <-done; !errors.Is(err, context.Canceled) {
+		t.Fatalf("canceled Render = %v, want context cancellation", err)
+	}
+	close(backend.release)
+	<-backend.completed
+	if outcome, err := gateway.Render(t.Context(), nil); err != nil || outcome != attention.OutcomeCleared {
+		t.Fatalf("clear after canceled draw = %q, %v", outcome, err)
+	}
+	if got, want := backend.operations, []string{"draw", "clear"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("operations = %v, want %v", got, want)
 	}
 }
 
@@ -814,6 +841,28 @@ type fakeDisplay struct {
 	audio         []busylib.PlayAudio
 	audioErr      error
 }
+
+type cancelAfterDrawBackend struct {
+	started, release, completed chan struct{}
+	operations                  []string
+}
+
+func (b *cancelAfterDrawBackend) Draw(context.Context, busylib.DisplayElements) error {
+	b.operations = append(b.operations, "draw")
+	close(b.started)
+	<-b.release
+	close(b.completed)
+	return nil
+}
+func (b *cancelAfterDrawBackend) Clear(context.Context, string) error {
+	b.operations = append(b.operations, "clear")
+	return nil
+}
+func (*cancelAfterDrawBackend) UploadFile(context.Context, string, string, string) error { return nil }
+func (*cancelAfterDrawBackend) ReadTo(context.Context, string, io.Writer) (int64, error) {
+	return 0, nil
+}
+func (*cancelAfterDrawBackend) Remove(context.Context, string) error { return nil }
 
 func (d *fakeDisplay) PlayAudio(_ context.Context, value busylib.PlayAudio) error {
 	d.audio = append(d.audio, value)
