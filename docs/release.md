@@ -77,6 +77,6 @@ soak_directory="$(mktemp -d)"
 go run ./cmd/releasectl soak --root . --output "$soak_directory/soak.jsonl"
 ```
 
-The soak uses the production daemon with Mac Resources and Codex Quota against loopback dependencies and runs the shipped GitHub Notifications process with an exact empty, unconfigured app. After 10 seconds of warmup, it takes 12 samples at five-second intervals. Each must stay at or below 1.0 percent aggregate CPU and 100 MiB aggregate RSS. Invalid or missing telemetry fails the check; cleanup must remove the process tree and control socket. Separate deterministic package tests exercise configured provider behavior against injected local fixtures.
+The soak uses the production daemon with Mac Resources and Codex Quota against loopback dependencies and runs the shipped GitHub Notifications and Slack processes with exact empty, unconfigured apps. After 10 seconds of warmup, it takes 12 samples at five-second intervals. Each must stay at or below 1.0 percent aggregate CPU and 100 MiB aggregate RSS. Invalid or missing telemetry fails the check; cleanup must remove the process tree and control socket. Separate deterministic package tests exercise configured provider behavior against injected local fixtures.
 
 Keep the JSONL, its SHA-256, source revision, toolchain, host, workload, and binary hashes. The process soak does not exercise a configured GitHub credential or provider collection. This verifies only that loopback run, not physical-device behavior, sleep/wake recovery, live provider compatibility, or long-duration stability.

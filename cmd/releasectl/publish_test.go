@@ -61,14 +61,14 @@ func TestBuildReleaseSpecsBindsExactInspectedAssetsAndVerifiedCatalog(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(specs) != 6 || specs[0].Tag != "plugin/calendar/v0.5.0" || specs[1].Tag != "plugin/codex-quota/v0.2.0" || specs[2].Tag != "plugin/codex/v0.4.0" || specs[3].Tag != "plugin/github-notifications/v0.1.0" || specs[4].Tag != "plugin/mac-resources/v0.3.0" || specs[5].Tag != "v0.1.0" {
+	if len(specs) != 7 || specs[0].Tag != "plugin/calendar/v0.5.0" || specs[1].Tag != "plugin/codex-quota/v0.2.0" || specs[2].Tag != "plugin/codex/v0.4.0" || specs[3].Tag != "plugin/github-notifications/v0.1.0" || specs[4].Tag != "plugin/mac-resources/v0.3.0" || specs[5].Tag != "plugin/slack/v0.1.0" || specs[6].Tag != "v0.1.0" {
 		t.Fatalf("release specs = %#v", specs)
 	}
-	if len(specs[0].Assets) != 2 || len(specs[1].Assets) != 2 || len(specs[2].Assets) != 2 || len(specs[3].Assets) != 2 || len(specs[4].Assets) != 2 || len(specs[5].Assets) != 7 {
-		t.Fatalf("release asset counts = %d, %d, %d, %d, %d, %d", len(specs[0].Assets), len(specs[1].Assets), len(specs[2].Assets), len(specs[3].Assets), len(specs[4].Assets), len(specs[5].Assets))
+	if len(specs[0].Assets) != 2 || len(specs[1].Assets) != 2 || len(specs[2].Assets) != 2 || len(specs[3].Assets) != 2 || len(specs[4].Assets) != 2 || len(specs[5].Assets) != 2 || len(specs[6].Assets) != 7 {
+		t.Fatalf("release asset counts = %d, %d, %d, %d, %d, %d, %d", len(specs[0].Assets), len(specs[1].Assets), len(specs[2].Assets), len(specs[3].Assets), len(specs[4].Assets), len(specs[5].Assets), len(specs[6].Assets))
 	}
-	coreAssetNames := make([]string, 0, len(specs[5].Assets))
-	for _, asset := range specs[5].Assets {
+	coreAssetNames := make([]string, 0, len(specs[6].Assets))
+	for _, asset := range specs[6].Assets {
 		coreAssetNames = append(coreAssetNames, asset.Name)
 	}
 	wantCoreAssetNames := []string{

@@ -20,6 +20,7 @@ const (
 	CodexQuotaName                = "bsbctl-plugin-codex-quota"
 	GitHubNotificationsName       = "bsbctl-plugin-github-notifications"
 	MacResourcesName              = "bsbctl-plugin-mac-resources"
+	SlackName                     = "bsbctl-plugin-slack"
 	DefaultCPUPercent             = 1.0
 	DefaultRSSBytes         int64 = 100 << 20
 )
@@ -29,6 +30,7 @@ var daemonProcessNames = map[string]struct{}{
 	CodexQuotaName:          {},
 	GitHubNotificationsName: {},
 	MacResourcesName:        {},
+	SlackName:               {},
 }
 
 type ProcessSnapshot struct {
@@ -205,6 +207,9 @@ func SelectDaemonTree(rows []ProcessSnapshot, parentPID int) ([]ProcessIdentity,
 	}
 	if _, ok := seen[MacResourcesName]; !ok {
 		return nil, errors.New("Mac resources resident process telemetry is unavailable")
+	}
+	if _, ok := seen[SlackName]; !ok {
+		return nil, errors.New("Slack resident process telemetry is unavailable")
 	}
 	slices.SortFunc(identities, func(left, right ProcessIdentity) int { return cmp.Compare(left.Name, right.Name) })
 	return identities, nil

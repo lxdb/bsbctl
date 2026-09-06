@@ -205,7 +205,7 @@ func TestCollectSoakSamplesRechecksHealthForEverySuccessfulSample(t *testing.T) 
 		t.Fatalf("samples/status/tree/count calls = %d/%d/%d/%d, want 3/3/3/3", len(samples), statusCalls, treeCalls, countCalls)
 	}
 	for index, sample := range samples {
-		if sample.Health.DevicePhase != device.PhaseReady || len(sample.Health.Processes) != 4 || sample.Health.FakeRequests.StateMessages != int64(index+2) {
+		if sample.Health.DevicePhase != device.PhaseReady || len(sample.Health.Processes) != 5 || sample.Health.FakeRequests.StateMessages != int64(index+2) {
 			t.Fatalf("sample %d health = %#v", index+1, sample.Health)
 		}
 	}
@@ -309,6 +309,7 @@ func testSoakIdentities() []soak.ProcessIdentity {
 		{PID: 103, PPID: 101, Name: soak.CodexQuotaName},
 		{PID: 104, PPID: 101, Name: soak.GitHubNotificationsName},
 		{PID: 102, PPID: 101, Name: soak.MacResourcesName},
+		{PID: 105, PPID: 101, Name: soak.SlackName},
 	}
 }
 
@@ -319,11 +320,13 @@ func testSoakStatus(lastStateAt time.Time) control.Status {
 			{ID: "dev.bsbctl.codex-quota", Phase: pluginhost.PhaseRunning, Running: true, Healthy: true},
 			{ID: "dev.bsbctl.github-notifications", Phase: pluginhost.PhaseRunning, Running: true, Healthy: true},
 			{ID: "dev.bsbctl.mac-resources", Phase: pluginhost.PhaseRunning, Running: true, Healthy: true},
+			{ID: "dev.bsbctl.slack", Phase: pluginhost.PhaseRunning, Running: true, Healthy: true},
 		},
 		Readiness: []daemon.AppReadiness{
 			{AppID: "codex-quota", Phase: daemon.AppReady},
 			{AppID: "github-notifications", Phase: daemon.AppReady},
 			{AppID: "mac-resources", Phase: daemon.AppReady},
+			{AppID: "slack", Phase: daemon.AppReady},
 		},
 	}
 }

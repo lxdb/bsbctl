@@ -17,13 +17,14 @@ func TestRunVerifyTagsDereferencesEveryReleaseTagToTheBuiltCommit(t *testing.T) 
 	gitCommand(t, root, "tag", "-a", "plugin/codex-quota/v0.1.0", "-m", "codex quota v0.1.0", builtCommit)
 	gitCommand(t, root, "tag", "plugin/github-notifications/v0.1.0", builtCommit)
 	gitCommand(t, root, "tag", "plugin/mac-resources/v0.1.0", builtCommit)
+	gitCommand(t, root, "tag", "plugin/slack/v0.1.0", builtCommit)
 
 	var stdout, stderr bytes.Buffer
 	code := run([]string{"verify-tags", "--root", root, "--commit", builtCommit}, &stdout, &stderr)
 	if code != exitSuccess || stderr.Len() != 0 {
 		t.Fatalf("verify-tags exit=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
-	want := "release tags: all 6 resolve to " + builtCommit + "\n"
+	want := "release tags: all 7 resolve to " + builtCommit + "\n"
 	if stdout.String() != want {
 		t.Fatalf("stdout = %q, want %q", stdout.String(), want)
 	}
@@ -44,6 +45,7 @@ func TestRunVerifyTagsRejectsAnyTagAtAnotherCommitOrMissingTag(t *testing.T) {
 				gitCommand(t, root, "tag", "plugin/codex-quota/v0.1.0", previousCommit)
 				gitCommand(t, root, "tag", "plugin/github-notifications/v0.1.0", builtCommit)
 				gitCommand(t, root, "tag", "plugin/mac-resources/v0.1.0", builtCommit)
+				gitCommand(t, root, "tag", "plugin/slack/v0.1.0", builtCommit)
 			},
 		},
 		{
@@ -53,6 +55,7 @@ func TestRunVerifyTagsRejectsAnyTagAtAnotherCommitOrMissingTag(t *testing.T) {
 				gitCommand(t, root, "tag", "plugin/calendar/v0.1.0", builtCommit)
 				gitCommand(t, root, "tag", "plugin/codex/v0.1.0", builtCommit)
 				gitCommand(t, root, "tag", "plugin/codex-quota/v0.1.0", builtCommit)
+				gitCommand(t, root, "tag", "plugin/github-notifications/v0.1.0", builtCommit)
 				gitCommand(t, root, "tag", "plugin/mac-resources/v0.1.0", builtCommit)
 			},
 		},
@@ -80,7 +83,7 @@ func releaseTagRepository(t *testing.T) (string, string) {
 	writeReleaseFile(t, filepath.Join(root, "tracked"), "first\n")
 	gitCommand(t, root, "add", "tracked")
 	gitCommand(t, root, "commit", "--quiet", "-m", "first")
-	writeReleaseFile(t, filepath.Join(root, "release", "versions.json"), `{"schema_version":1,"components":[{"id":"bsbctl","kind":"core","version":"0.1.0","tag":"v0.1.0","package":"./cmd/bsbctl","binary":"bsbctl"},{"id":"dev.bsbctl.calendar","kind":"plugin","version":"0.1.0","tag":"plugin/calendar/v0.1.0","package":"./cmd/bsbctl-plugin-calendar","binary":"bsbctl-plugin-calendar"},{"id":"dev.bsbctl.codex","kind":"plugin","version":"0.1.0","tag":"plugin/codex/v0.1.0","package":"./cmd/bsbctl-plugin-codex","binary":"bsbctl-plugin-codex"},{"id":"dev.bsbctl.codex-quota","kind":"plugin","version":"0.1.0","tag":"plugin/codex-quota/v0.1.0","package":"./cmd/bsbctl-plugin-codex-quota","binary":"bsbctl-plugin-codex-quota"},{"id":"dev.bsbctl.github-notifications","kind":"plugin","version":"0.1.0","tag":"plugin/github-notifications/v0.1.0","package":"./cmd/bsbctl-plugin-github-notifications","binary":"bsbctl-plugin-github-notifications"},{"id":"dev.bsbctl.mac-resources","kind":"plugin","version":"0.1.0","tag":"plugin/mac-resources/v0.1.0","package":"./cmd/bsbctl-plugin-mac-resources","binary":"bsbctl-plugin-mac-resources"}]}`)
+	writeReleaseFile(t, filepath.Join(root, "release", "versions.json"), `{"schema_version":1,"components":[{"id":"bsbctl","kind":"core","version":"0.1.0","tag":"v0.1.0","package":"./cmd/bsbctl","binary":"bsbctl"},{"id":"dev.bsbctl.calendar","kind":"plugin","version":"0.1.0","tag":"plugin/calendar/v0.1.0","package":"./cmd/bsbctl-plugin-calendar","binary":"bsbctl-plugin-calendar"},{"id":"dev.bsbctl.codex","kind":"plugin","version":"0.1.0","tag":"plugin/codex/v0.1.0","package":"./cmd/bsbctl-plugin-codex","binary":"bsbctl-plugin-codex"},{"id":"dev.bsbctl.codex-quota","kind":"plugin","version":"0.1.0","tag":"plugin/codex-quota/v0.1.0","package":"./cmd/bsbctl-plugin-codex-quota","binary":"bsbctl-plugin-codex-quota"},{"id":"dev.bsbctl.github-notifications","kind":"plugin","version":"0.1.0","tag":"plugin/github-notifications/v0.1.0","package":"./cmd/bsbctl-plugin-github-notifications","binary":"bsbctl-plugin-github-notifications"},{"id":"dev.bsbctl.mac-resources","kind":"plugin","version":"0.1.0","tag":"plugin/mac-resources/v0.1.0","package":"./cmd/bsbctl-plugin-mac-resources","binary":"bsbctl-plugin-mac-resources"},{"id":"dev.bsbctl.slack","kind":"plugin","version":"0.1.0","tag":"plugin/slack/v0.1.0","package":"./cmd/bsbctl-plugin-slack","binary":"bsbctl-plugin-slack"}]}`)
 	gitCommand(t, root, "add", "release/versions.json")
 	gitCommand(t, root, "commit", "--quiet", "-m", "release plan")
 	return root, strings.TrimSpace(gitCommand(t, root, "rev-parse", "HEAD"))
