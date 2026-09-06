@@ -3,6 +3,7 @@
 package main
 
 import (
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -31,6 +32,7 @@ func TestScenariosCompileTheProductionScenesWithMockAssets(t *testing.T) {
 			6 * time.Second, 6 * time.Second, 6 * time.Second, 6 * time.Second, 6 * time.Second,
 		}},
 		{name: "Codex quota", file: "codex-quota-front.gif", capture: true, sampleInterval: 250 * time.Millisecond, durations: []time.Duration{2 * time.Second, 2 * time.Second}},
+		{name: "GitHub notifications", file: "github-notifications-front.gif", capture: true, sampleInterval: 300 * time.Millisecond, durations: []time.Duration{30 * time.Second, 30 * time.Second}},
 		{name: "Mac resources", file: "mac-resources-front.gif", sampleInterval: 250 * time.Millisecond, durations: []time.Duration{2 * time.Second, 2 * time.Second, 2 * time.Second}},
 	}
 	if len(scenarios) != len(want) {
@@ -56,7 +58,8 @@ func TestScenariosCompileTheProductionScenesWithMockAssets(t *testing.T) {
 				}
 			}
 			wantBackground := "#071522FF"
-			if scenario.Name == "Calendar" {
+			switch scenario.Name {
+			case "Calendar":
 				wantBackground = "#000000FF"
 			}
 			background, ok := step.Draw.Elements[0].(busylib.RectangleElement)
@@ -66,6 +69,36 @@ func TestScenariosCompileTheProductionScenesWithMockAssets(t *testing.T) {
 		}
 		if scenario.Duration != duration {
 			t.Fatalf("%s duration = %v, want step total %v", scenario.Name, scenario.Duration, duration)
+		}
+	}
+}
+
+func TestEveryCompiledPackageImageHasACaptureAsset(t *testing.T) {
+	scenarios, err := previewScenarios(time.Date(2026, time.September, 4, 12, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatal(err)
+	}
+	uploads := make(map[string]string, len(previewCaptureAssets))
+	for _, asset := range previewCaptureAssets {
+		uploads[asset.devicePath] = filepath.ToSlash(asset.sourcePath)
+	}
+	want := map[string]string{
+		previewAssetPath:       "plugins/codex/assets/codex-mark.png",
+		githubPreviewAssetPath: "plugins/githubnotifications/assets/github-mark.png",
+	}
+	for path, source := range want {
+		if uploads[path] != source {
+			t.Errorf("capture asset %q source = %q, want %q", path, uploads[path], source)
+		}
+	}
+	for _, scenario := range scenarios {
+		for _, step := range scenario.Steps {
+			for _, element := range step.Draw.Elements {
+				imageElement, ok := element.(busylib.ImageElement)
+				if ok && imageElement.Path != "" && uploads[imageElement.Path] == "" {
+					t.Errorf("%s image %q has no capture upload", scenario.Name, imageElement.Path)
+				}
+			}
 		}
 	}
 }

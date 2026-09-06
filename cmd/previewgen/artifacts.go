@@ -16,6 +16,7 @@ var previewArtifactNames = []string{
 	"calendar-front.gif",
 	"codex-front.gif",
 	"codex-quota-front.gif",
+	"github-notifications-front.gif",
 	"mac-resources-front.gif",
 }
 

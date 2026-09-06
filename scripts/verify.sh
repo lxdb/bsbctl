@@ -77,7 +77,7 @@ run_test() {
 run_preview() {
   phase "preview-tagged tests"
   root_go test -mod=readonly -tags preview ./cmd/previewgen -shuffle=on -count=1
-  root_go test -mod=readonly -tags preview ./plugins/calendar ./plugins/codex ./plugins/codexquota ./plugins/macresources -run Preview -shuffle=on -count=1
+  root_go test -mod=readonly -tags preview ./plugins/calendar ./plugins/codex ./plugins/codexquota ./plugins/githubnotifications ./plugins/macresources -run Preview -shuffle=on -count=1
 }
 
 run_race() {

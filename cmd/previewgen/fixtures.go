@@ -37,6 +37,12 @@ var codexQuotaFixtureGIF []byte
 //go:embed fixtures/codex-quota-front.gif.sha256
 var codexQuotaFixtureSHA256 string
 
+//go:embed fixtures/github-notifications-front.gif
+var githubNotificationsFixtureGIF []byte
+
+//go:embed fixtures/github-notifications-front.gif.sha256
+var githubNotificationsFixtureSHA256 string
+
 //go:embed fixtures/mac-resources-front.gif
 var macResourcesFixtureGIF []byte
 
@@ -51,6 +57,7 @@ var reviewedMockFixtures = []mockFixture{
 	{name: "calendar-front.gif", format: "gif", data: calendarFixtureGIF, sha256: strings.TrimSpace(calendarFixtureSHA256)},
 	{name: "codex-front.gif", format: "gif", data: codexFixtureGIF, sha256: strings.TrimSpace(codexFixtureSHA256)},
 	{name: "codex-quota-front.gif", format: "gif", data: codexQuotaFixtureGIF, sha256: strings.TrimSpace(codexQuotaFixtureSHA256)},
+	{name: "github-notifications-front.gif", format: "gif", data: githubNotificationsFixtureGIF, sha256: strings.TrimSpace(githubNotificationsFixtureSHA256)},
 	{name: "mac-resources-front.gif", format: "gif", data: macResourcesFixtureGIF, sha256: "645f7a1ba20f007f10e46bf42f8f2fb7e9307f374b3f80f99580daba49ba0f91"},
 }
 
@@ -89,7 +96,7 @@ func generateFixtureArtifactsFrom(fixtures []mockFixture) (map[string][]byte, er
 
 func mergeCapturedFixtures(captured []mockFixture) ([]mockFixture, error) {
 	if len(captured) != len(capturedPreviewArtifactNames) {
-		return nil, errors.New("capture must produce Calendar, Codex, and Codex quota fixtures")
+		return nil, errors.New("capture must produce every device-rendered preview fixture")
 	}
 	replacements := make(map[string]mockFixture, len(captured))
 	for _, fixture := range captured {
