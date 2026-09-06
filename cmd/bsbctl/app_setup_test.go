@@ -7,7 +7,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-
 )
 
 func TestAppSetupCommandRoutesAndHelpAdvertisesSecureInput(t *testing.T) {
