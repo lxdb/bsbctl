@@ -6,25 +6,11 @@
 
 These previews use mock data. See [preview generation](docs/maintainers/development.md#preview-generation) for how they are made.
 
-<p align="center">
-  <strong>Local Mac Calendar</strong><br>
-  <img src="docs/previews/calendar-front.gif" alt="Calendar app showing bsbctl release review and preview capture events with countdowns and event options on a BUSY Bar" width="520">
-</p>
-
-<p align="center">
-  <strong>Codex</strong><br>
-  <img src="docs/previews/codex-front.gif" alt="Codex app showing bsbctl activity, plans, approvals, questions, compaction, completion, interruption, and failure states on a BUSY Bar" width="520">
-</p>
-
-<p align="center">
-  <strong>Codex quota</strong><br>
-  <img src="docs/previews/codex-quota-front.gif" alt="Codex Quota app showing normal weekly and critical five-hour mock allowances on a BUSY Bar" width="520">
-</p>
-
-<p align="center">
-  <strong>Mac Resources</strong><br>
-  <img src="docs/previews/mac-resources-front.gif" alt="Mac Resources app showing fixed mock CPU, memory, and network readings on a BUSY Bar" width="520">
-</p>
+| Local Mac Calendar | Codex | Codex quota |
+| :---: | :---: | :---: |
+| ![Calendar app showing bsbctl release review and preview capture events with countdowns and event options on a BUSY Bar](docs/previews/calendar-front.gif) | ![Codex app showing bsbctl activity, plans, approvals, questions, compaction, completion, interruption, and failure states on a BUSY Bar](docs/previews/codex-front.gif) | ![Codex Quota app showing normal weekly and critical five-hour mock allowances on a BUSY Bar](docs/previews/codex-quota-front.gif) |
+| **Mac Resources** |  |  |
+| ![Mac Resources app showing fixed mock CPU, memory, and network readings on a BUSY Bar](docs/previews/mac-resources-front.gif) |  |  |
 
 ## Install
 
