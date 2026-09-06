@@ -52,6 +52,17 @@ Use [the protocol specification](protocol/v1/spec.md#observations-and-presentati
 
 Bind work to the supplied instance generation and session token. Make session end idempotent. Input must return `consumed` or `not_consumed`; do not retry ambiguous input. For BACK, return `consumed` only if your plugin handled navigation or a terminal action. Otherwise the daemon dismisses the view and applies its cooldown.
 
+`StartSession` runs while admission is pending. Bind the supplied observation identity and revision there; wait for session input before requesting execution. Channel policies can opt into forwarding the activating START press or encoder event after exact-session promotion:
+
+| Daemon policy field | Accepted value | Behavior |
+| --- | --- | --- |
+| `activation_action` | Action identifier | Opens an observation-triggered session. |
+| `activation_input` | Unset | Consumes the activating press without forwarding it. |
+| `activation_input` | `"start"` | Requires `activation_action`; forwards the original press once through the session input broker after promotion. |
+| `activation_input` | `"start_or_encoder"` | Requires `activation_action`; lets START or an encoder event activate the observation and forwards that original input once after promotion. |
+
+The forwarded input retains its original UTC event time and receives the broker's ordinary sequence. Core binds it to the promoted token and generation; replacement or preemption never redirects it to another foreground session. These fields belong to daemon channel policy and do not extend the plugin configuration or session input wire format.
+
 Before opening a URL, replying to a provider, or performing another irreversible effect:
 
 1. Finish reversible validation and user confirmation.

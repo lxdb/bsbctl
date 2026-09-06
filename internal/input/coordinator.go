@@ -10,7 +10,14 @@ import (
 )
 
 type ObservationActivator interface {
-	ActivateSelected(context.Context) (bool, error)
+	ActivateSelected(context.Context, protocol.SessionInput) (ActivationResult, error)
+}
+
+// ActivationResult binds optional activation input to the session actually promoted.
+// An empty InputTarget preserves activation without forwarding the press.
+type ActivationResult struct {
+	Activated   bool
+	InputTarget SessionTarget
 }
 
 type SessionController interface {
@@ -178,23 +185,30 @@ func (c *Coordinator) handle(ctx context.Context, event *inputpb.InputEvent) err
 	if c.launcher != nil && c.launcher.Active() {
 		return c.launcher.Handle(ctx, event)
 	}
-	button := event.GetButtonEvent()
-	if button != nil && button.GetButton() == inputpb.Button_START && button.GetAction() == inputpb.ButtonAction_PRESS && c.activate != nil {
-		activated, err := c.activate.ActivateSelected(ctx)
-		if err != nil || activated {
-			return err
-		}
+	payload, valid := sessionInput(event)
+	if !valid {
+		return nil
 	}
 	instanceID, token := c.foreground()
 	if instanceID != "" && token != "" {
 		if c.publish == nil {
 			return nil
 		}
-		payload, ok := sessionInput(event)
-		if !ok {
-			return nil
-		}
 		return c.publish(instanceID, token, payload, c.now().UTC())
+	}
+	start := payload.Button != nil && payload.Button.Button == protocol.ButtonStart && payload.Button.Action == protocol.ButtonPress
+	if (start || payload.Encoder != nil) && c.activate != nil {
+		occurredAt := c.now().UTC()
+		result, err := c.activate.ActivateSelected(ctx, payload)
+		if err != nil {
+			return err
+		}
+		if result.Activated {
+			target := result.InputTarget
+			if target.InstanceID != "" && target.Token != "" && c.publish != nil {
+				return c.publish(target.InstanceID, target.Token, payload, occurredAt)
+			}
+		}
 	}
 	return nil
 }
