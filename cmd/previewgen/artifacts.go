@@ -18,6 +18,7 @@ var previewArtifactNames = []string{
 	"codex-quota-front.gif",
 	"github-notifications-front.gif",
 	"mac-resources-front.gif",
+	"slack-front.gif",
 }
 
 func writeArtifacts(output string, artifacts map[string][]byte) error {

@@ -77,6 +77,7 @@ func TestCaptureFixtureSetEncodesCompleteOpaqueDeviceRenderedGIFs(t *testing.T) 
 		{Name: "Codex", File: "codex-front.gif", Capture: true, Steps: []previewStep{{Duration: 500 * time.Millisecond, Draw: busylib.DisplayElements{ApplicationName: "green"}}}, Duration: 500 * time.Millisecond},
 		{Name: "Codex quota", File: "codex-quota-front.gif", Capture: true, Steps: []previewStep{{Duration: 500 * time.Millisecond, Draw: busylib.DisplayElements{ApplicationName: "blue"}}}, Duration: 500 * time.Millisecond},
 		{Name: "GitHub notifications", File: "github-notifications-front.gif", Capture: true, Steps: []previewStep{{Duration: 500 * time.Millisecond, Draw: busylib.DisplayElements{ApplicationName: "yellow"}}}, Duration: 500 * time.Millisecond},
+		{Name: "Slack", File: "slack-front.gif", Capture: true, Steps: []previewStep{{Duration: 500 * time.Millisecond, Draw: busylib.DisplayElements{ApplicationName: "purple"}}}, Duration: 500 * time.Millisecond},
 	}
 
 	fixtures, err := captureFixtureSet(
@@ -128,6 +129,7 @@ func TestCaptureFixtureSetSelectsCapturedPreviewsIndependentOfScenarioOrder(t *t
 		{Name: "Codex quota", File: "codex-quota-front.gif", Capture: true, Steps: []previewStep{{Duration: 10 * time.Millisecond, Draw: busylib.DisplayElements{ApplicationName: "blue"}}}, Duration: 10 * time.Millisecond},
 		{Name: "Calendar", File: "calendar-front.gif", Capture: true, Steps: []previewStep{{Duration: 10 * time.Millisecond, Draw: busylib.DisplayElements{ApplicationName: "red"}}}, Duration: 10 * time.Millisecond},
 		{Name: "Codex", File: "codex-front.gif", Capture: true, SampleInterval: 300 * time.Millisecond, Steps: []previewStep{{Duration: 10 * time.Millisecond, Draw: busylib.DisplayElements{ApplicationName: "green"}}}, Duration: 10 * time.Millisecond},
+		{Name: "Slack", File: "slack-front.gif", Capture: true, Steps: []previewStep{{Duration: 10 * time.Millisecond, Draw: busylib.DisplayElements{ApplicationName: "purple"}}}, Duration: 10 * time.Millisecond},
 		{Name: "GitHub notifications", File: "github-notifications-front.gif", Capture: true, Steps: []previewStep{{Duration: 10 * time.Millisecond, Draw: busylib.DisplayElements{ApplicationName: "yellow"}}}, Duration: 10 * time.Millisecond},
 	}
 

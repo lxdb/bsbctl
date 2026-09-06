@@ -46,6 +46,12 @@ var githubNotificationsFixtureSHA256 string
 //go:embed fixtures/mac-resources-front.gif
 var macResourcesFixtureGIF []byte
 
+//go:embed fixtures/slack-front.gif
+var slackFixtureGIF []byte
+
+//go:embed fixtures/slack-front.gif.sha256
+var slackFixtureSHA256 string
+
 type mockFixture struct {
 	name   string
 	format string
@@ -59,6 +65,7 @@ var reviewedMockFixtures = []mockFixture{
 	{name: "codex-quota-front.gif", format: "gif", data: codexQuotaFixtureGIF, sha256: strings.TrimSpace(codexQuotaFixtureSHA256)},
 	{name: "github-notifications-front.gif", format: "gif", data: githubNotificationsFixtureGIF, sha256: strings.TrimSpace(githubNotificationsFixtureSHA256)},
 	{name: "mac-resources-front.gif", format: "gif", data: macResourcesFixtureGIF, sha256: "645f7a1ba20f007f10e46bf42f8f2fb7e9307f374b3f80f99580daba49ba0f91"},
+	{name: "slack-front.gif", format: "gif", data: slackFixtureGIF, sha256: strings.TrimSpace(slackFixtureSHA256)},
 }
 
 func generateFixtureArtifacts() (map[string][]byte, error) {

@@ -72,6 +72,14 @@ func TestReviewedMockFrameFixturesGenerateEveryPublishableArtifact(t *testing.T)
 			if len(animation.Image) < 20 || duration != 6000 {
 				t.Fatalf("%s frames/duration = %d/%dcs, want two animated 30s attention states", name, len(animation.Image), duration)
 			}
+		case "slack-front.gif":
+			duration := 0
+			for _, delay := range animation.Delay {
+				duration += delay
+			}
+			if len(animation.Image) < 20 || duration != 5400 {
+				t.Fatalf("%s frames/duration = %d/%dcs, want animated marquee scenes totaling 54s", name, len(animation.Image), duration)
+			}
 		}
 	}
 }
@@ -112,6 +120,7 @@ func TestWriteArtifactsReplacesOnlyTheExpectedFiles(t *testing.T) {
 		"codex-quota-front.gif":          []byte("quota"),
 		"github-notifications-front.gif": []byte("notifications"),
 		"mac-resources-front.gif":        []byte("resources"),
+		"slack-front.gif":                []byte("slack"),
 	}
 	if err := writeArtifacts(output, artifacts); err != nil {
 		t.Fatal(err)

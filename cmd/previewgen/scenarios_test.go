@@ -34,6 +34,7 @@ func TestScenariosCompileTheProductionScenesWithMockAssets(t *testing.T) {
 		{name: "Codex quota", file: "codex-quota-front.gif", capture: true, sampleInterval: 250 * time.Millisecond, durations: []time.Duration{2 * time.Second, 2 * time.Second}},
 		{name: "GitHub notifications", file: "github-notifications-front.gif", capture: true, sampleInterval: 300 * time.Millisecond, durations: []time.Duration{30 * time.Second, 30 * time.Second}},
 		{name: "Mac resources", file: "mac-resources-front.gif", sampleInterval: 250 * time.Millisecond, durations: []time.Duration{2 * time.Second, 2 * time.Second, 2 * time.Second}},
+		{name: "Slack", file: "slack-front.gif", capture: true, sampleInterval: 250 * time.Millisecond, durations: []time.Duration{2 * time.Second, 2 * time.Second, 8 * time.Second, 8 * time.Second, 18 * time.Second, 8 * time.Second, 2 * time.Second, 2 * time.Second, 2 * time.Second, 2 * time.Second}},
 	}
 	if len(scenarios) != len(want) {
 		t.Fatalf("scenarios = %d, want %d", len(scenarios), len(want))
@@ -85,6 +86,7 @@ func TestEveryCompiledPackageImageHasACaptureAsset(t *testing.T) {
 	want := map[string]string{
 		previewAssetPath:       "plugins/codex/assets/codex-mark.png",
 		githubPreviewAssetPath: "plugins/githubnotifications/assets/github-mark.png",
+		slackPreviewAssetPath:  "plugins/slack/assets/slack-mark.png",
 	}
 	for path, source := range want {
 		if uploads[path] != source {

@@ -51,6 +51,7 @@ type previewCaptureAsset struct {
 var previewCaptureAssets = []previewCaptureAsset{
 	{label: "Codex mark", devicePath: previewAssetPath, sourcePath: filepath.Join("plugins", "codex", previewAssetSource)},
 	{label: "GitHub mark", devicePath: githubPreviewAssetPath, sourcePath: filepath.Join("plugins", "githubnotifications", githubPreviewAssetSource)},
+	{label: "Slack mark", devicePath: slackPreviewAssetPath, sourcePath: filepath.Join("plugins", "slack", slackPreviewAssetSource)},
 }
 
 func captureDeviceFixtures(ctx context.Context, options options) (result []mockFixture, resultErr error) {
