@@ -4,6 +4,11 @@
             "algorithm": "ed25519",
             "id": "stable-2026",
             "public_key_base64": "kuVahvekqoAnEzVqq76bmGcIL3brdv2DECK3Il2DRCc="
+        },
+        {
+            "algorithm": "ed25519",
+            "id": "stable-2026-r2",
+            "public_key_base64": "ht+OjNHbK3xQt6dTwZndnr71F0rRM8VT21od/8ZmZok="
         }
     ],
     "schema_version": 1

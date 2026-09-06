@@ -23,7 +23,7 @@ Release commands set `GOWORK=off` and verify the committed dependency graph. A s
 | --- | --- |
 | [`release/versions.json`](../release/versions.json) | Canonical component versions. Core tags use `vX.Y.Z`; plugin tags use `plugin/<name>/vX.Y.Z`. |
 | [`release/catalog-predecessor.json`](../release/catalog-predecessor.json) | First release uses `first_release` and sequence `1`. Later releases record the prior core tag and SHA-256 values of its published catalog and signature. |
-| [`internal/releasekeys/catalog_public_keys.json`](../internal/releasekeys/catalog_public_keys.json) | Production Ed25519 verification keys, including `stable-2026`. |
+| [`internal/releasekeys/catalog_public_keys.json`](../internal/releasekeys/catalog_public_keys.json) | Production Ed25519 verification keys. `stable-2026` verifies the first catalog; `stable-2026-r2` signs future catalogs. |
 | GitHub `release` environment | Required approval and `CATALOG_SIGNING_PRIVATE_KEY_B64` secret. |
 
 The secret must contain canonical base64 for the raw 64-byte Ed25519 private key. The signing job reads it through standard input and requires its public key to match the selected tracked key ID. Never commit the private key or pass it as a command-line argument.
