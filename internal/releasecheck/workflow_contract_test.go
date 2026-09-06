@@ -231,7 +231,7 @@ func TestReleaseWorkflowConsumesOnlyExactArtifactsFromTheSameRun(t *testing.T) {
 func assertPinnedActions(t *testing.T, workflow string) {
 	t.Helper()
 	allowed := map[string]string{
-		"actions/checkout":                    "11d5960a326750d5838078e36cf38b85af677262",
+		"actions/checkout":                    "3d3c42e5aac5ba805825da76410c181273ba90b1",
 		"actions/setup-go":                    "b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
 		"actions/upload-artifact":             "ea165f8d65b6e75b540449e92b4886f43607fa02",
 		"actions/download-artifact":           "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
