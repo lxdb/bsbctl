@@ -212,6 +212,10 @@ func (g *Gateway) Render(ctx context.Context, candidate *presentation.Candidate)
 		g.lastTopology = [sha256.Size]byte{}
 		g.lastPriority = 0
 	}
+	// A canceled or failed device call can still have changed the physical
+	// canvas. Retain ownership unless firmware explicitly rejected the draw so
+	// shutdown and later structural updates clear any ambiguous scene.
+	g.hasScene = true
 	if err := g.display.Draw(ctx, request); err != nil {
 		if apiErr, ok := errors.AsType[*busylib.APIError](err); ok && apiErr.StatusCode == http.StatusConflict {
 			g.resetScene()
