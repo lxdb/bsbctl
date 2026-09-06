@@ -1419,6 +1419,12 @@ func TestEngineDoesNotClearCurrentRotationBeforeItsNextDueTime(t *testing.T) {
 	if renderer.cleared || len(renderer.values) != 1 {
 		t.Fatalf("rotation caused writes before next due: cleared=%v renders=%d", renderer.cleared, len(renderer.values))
 	}
+	if err := engine.Step(context.Background(), now.Add(8*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if !renderer.cleared || len(renderer.values) != 2 || renderer.values[1] != nil {
+		t.Fatalf("rotation did not yield after its readable hold: cleared=%v values=%#v", renderer.cleared, renderer.values)
+	}
 }
 
 type recordingRenderer struct {
