@@ -45,6 +45,7 @@ func TestControlMutationResultsAreStableAndDoNotEchoConfiguration(t *testing.T) 
 		AppID: "ball8", Config: json.RawMessage(`{"sentinel":"private-config"}`),
 		Secrets:  map[string]string{"token": "keychain://bsbctl/private-account"},
 		Policies: map[string]presentation.PolicyConfig{"answer": {Policy: presentation.PolicyInteractive}}, LaunchAction: "ask",
+		ExpectedGeneration: 4,
 	}
 	var configured AppConfigResult
 	if err := client.Call(context.Background(), "app.replace_config", replacement, &configured); err != nil {
@@ -56,6 +57,9 @@ func TestControlMutationResultsAreStableAndDoNotEchoConfiguration(t *testing.T) 
 	}
 	if configured.Status != MutationUpdated || configured.AppID != "ball8" || configured.Generation != 5 || containsAny(string(encoded), "private-config", "private-account", "keychain://") {
 		t.Fatalf("config result = %s", encoded)
+	}
+	if backend.lastReplacement.ExpectedGeneration != replacement.ExpectedGeneration {
+		t.Fatalf("backend expected generation = %d, want %d", backend.lastReplacement.ExpectedGeneration, replacement.ExpectedGeneration)
 	}
 }
 
@@ -358,6 +362,24 @@ func TestControlClassifiesInvalidAndCommittedPartialConfigReplacement(t *testing
 	}
 }
 
+func TestControlClassifiesStaleConfigReplacementAsRejected(t *testing.T) {
+	backend := &mutationBackend{
+		fakeBackend:    &fakeBackend{document: emptyControlDocument()},
+		replaceOutcome: localstate.NotCommitted, replaceErr: config.ErrConflict,
+	}
+	_, client, cancel := startControlTestServer(t, backend)
+	defer cancel()
+	defer client.Close()
+
+	err := client.Call(t.Context(), "app.replace_config", ReplaceConfigRequest{
+		AppID: "ball8", Config: json.RawMessage(`{}`), Policies: map[string]presentation.PolicyConfig{}, ExpectedGeneration: 3,
+	}, nil)
+	rpcErr, ok := errors.AsType[*rpc.Error](err)
+	if !ok || rpcErr.Code != -32046 {
+		t.Fatalf("stale replacement error = %v", err)
+	}
+}
+
 func TestControlReturnsCommittedEnablementAsPartialWithoutRawError(t *testing.T) {
 	base := &mutationBackend{fakeBackend: &fakeBackend{document: config.Document{
 		Version: config.CurrentVersion, Generation: 3, Apps: map[string]config.App{"ball8": {ID: "ball8", PluginID: "plugin"}}, Plugins: map[string]config.Plugin{},
@@ -475,6 +497,7 @@ type mutationBackend struct {
 	catalogErr       error
 	catalogOperation string
 	replaceCalls     int
+	lastReplacement  daemon.AppConfiguration
 	replaceOutcome   localstate.CommitOutcome
 	replaceErr       error
 }
@@ -531,6 +554,7 @@ func (b *partialEnableBackend) SetEnabled(_ context.Context, appID string, enabl
 
 func (b *mutationBackend) ReplaceAppConfiguration(_ context.Context, appID string, replacement daemon.AppConfiguration) (config.Document, localstate.CommitOutcome, error) {
 	b.replaceCalls++
+	b.lastReplacement = replacement
 	document := b.document
 	app := document.Apps[appID]
 	app.Config = append(json.RawMessage(nil), replacement.Config...)

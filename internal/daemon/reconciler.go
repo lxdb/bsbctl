@@ -77,10 +77,12 @@ type LaunchableApp struct {
 // instance's configurable fields. Package identity and enablement remain
 // daemon-owned.
 type AppConfiguration struct {
-	Config       json.RawMessage
-	Secrets      map[string]string
-	Policies     map[string]presentation.PolicyConfig
-	LaunchAction string
+	// ExpectedGeneration is zero for no precondition or the required document generation.
+	ExpectedGeneration uint64
+	Config             json.RawMessage
+	Secrets            map[string]string
+	Policies           map[string]presentation.PolicyConfig
+	LaunchAction       string
 }
 
 // EnableResult contains only facts from one enablement operation. Error is

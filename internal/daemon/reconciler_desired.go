@@ -345,6 +345,10 @@ func (s *Reconciler) ReplaceAppConfiguration(ctx context.Context, appID string, 
 	retained := readyInstancesFromSpecs(s.live.specs)
 	validate := s.desired.validator
 	s.live.mu.RUnlock()
+	if replacement.ExpectedGeneration != 0 && replacement.ExpectedGeneration != expectedGeneration {
+		s.desired.mu.Unlock()
+		return config.Document{}, localstate.NotCommitted, fmt.Errorf("%w: current generation is %d", config.ErrConflict, expectedGeneration)
+	}
 	if _, exists := current.Apps[appID]; !exists {
 		s.desired.mu.Unlock()
 		return config.Document{}, localstate.NotCommitted, fmt.Errorf("%w: %s", ErrAppNotFound, appID)

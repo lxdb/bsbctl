@@ -59,6 +59,55 @@ func TestReplaceAppConfigurationCommitsOneCompleteReplacementAndReconciles(t *te
 	}
 }
 
+func TestReplaceAppConfigurationRejectsStaleExpectedGenerationBeforeReplacingNewerFields(t *testing.T) {
+	store := config.NewStore(filepath.Join(t.TempDir(), "config.json"))
+	if _, err := store.ReplaceWithOutcome(0, serviceDocument(true)); err != nil {
+		t.Fatal(err)
+	}
+	plugins := newBlockingApplyController()
+	service := newTestReconciler(t, store, SecretResolverFunc(func(context.Context, string) (string, error) { return "resolved", nil }), plugins)
+	t.Cleanup(func() { _ = service.Close(context.Background()) })
+	if err := service.Load(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	release := sync.OnceFunc(func() { close(plugins.oldRelease) })
+	t.Cleanup(release)
+
+	newer := AppConfiguration{
+		ExpectedGeneration: 1,
+		Config:             json.RawMessage(`{"question":"newer"}`),
+		Policies:           map[string]presentation.PolicyConfig{"answer": {Policy: presentation.PolicyRotation, RotationIntervalMS: 30_000}},
+		LaunchAction:       "newer-action",
+	}
+	newerDone := make(chan error, 1)
+	go func() {
+		_, _, err := service.ReplaceAppConfiguration(t.Context(), "ball8", newer)
+		newerDone <- err
+	}()
+	awaitServiceSignal(t, plugins.oldStarted, "newer configuration reconciliation")
+
+	stale := AppConfiguration{
+		ExpectedGeneration: 1,
+		Config:             json.RawMessage(`{"question":"stale"}`),
+		Policies:           map[string]presentation.PolicyConfig{"answer": {Policy: presentation.PolicyInteractive}},
+		LaunchAction:       "stale-action",
+	}
+	_, outcome, err := service.ReplaceAppConfiguration(t.Context(), "ball8", stale)
+	if !errors.Is(err, config.ErrConflict) || outcome != localstate.NotCommitted {
+		t.Fatalf("stale replacement outcome/error = %q, %v", outcome, err)
+	}
+	persisted, loadErr := store.Load()
+	app := persisted.Apps["ball8"]
+	if loadErr != nil || persisted.Generation != 2 || string(app.Config) != string(newer.Config) || app.LaunchAction != newer.LaunchAction || !reflect.DeepEqual(app.Policies, newer.Policies) {
+		t.Fatalf("newer configuration was overwritten: document=%#v error=%v", persisted, loadErr)
+	}
+
+	release()
+	if err := <-newerDone; err != nil {
+		t.Fatalf("newer replacement: %v", err)
+	}
+}
+
 func TestReconcilerActivatorChangesOnlyVerifiedPluginPackage(t *testing.T) {
 	store := config.NewStore(filepath.Join(t.TempDir(), "config.json"))
 	original := serviceDocument(true)

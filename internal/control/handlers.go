@@ -146,7 +146,8 @@ func (s *Server) registerAppHandlers(peer controlPeer) {
 			return nil, &rpc.Error{Code: -32602, Message: "invalid params"}
 		}
 		document, outcome, err := s.backends.Apps.ReplaceAppConfiguration(callCtx, request.AppID, daemon.AppConfiguration{
-			Config: append(json.RawMessage(nil), request.Config...), Secrets: request.Secrets,
+			ExpectedGeneration: request.ExpectedGeneration,
+			Config:             append(json.RawMessage(nil), request.Config...), Secrets: request.Secrets,
 			Policies: request.Policies, LaunchAction: request.LaunchAction,
 		})
 		if err != nil && !outcome.IsCommitted() {

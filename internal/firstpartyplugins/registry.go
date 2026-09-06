@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/lxdb/bsbctl/internal/appsetup"
 	"github.com/lxdb/bsbctl/internal/assets"
 	"github.com/lxdb/bsbctl/internal/config"
 	"github.com/lxdb/bsbctl/internal/presentation"
@@ -38,6 +39,7 @@ type Descriptor struct {
 	SoakProfile          string
 	SoakExclusion        string
 	DefaultApp           config.App
+	Setup                appsetup.Runner
 }
 
 var descriptors = []Descriptor{
