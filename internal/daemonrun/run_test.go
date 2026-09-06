@@ -82,18 +82,22 @@ func TestShutdownPhasesDoNotLetSlowServiceStarveFinalClearAndOutputJoin(t *testi
 		t.Fatal(err)
 	}
 	backend := &shutdownDeviceClient{drawn: make(chan struct{}, 1), clearing: make(chan struct{}, 1), releaseClear: make(chan struct{})}
-	plugins := &slowShutdownRuntime{applied: make(chan protocol.InstanceRef, 1), abort: make(chan struct{})}
+	plugins := &slowShutdownRuntime{
+		applied: make(chan protocol.InstanceRef, 1), closeStarted: make(chan struct{}, 1), releaseClose: make(chan struct{}),
+	}
 	dependencies := testDaemonDependencies()
 	dependencies.newPluginRuntime = func(callbacks pluginhost.Callbacks) pluginRuntime {
 		plugins.callbacks = callbacks
 		return plugins
 	}
+	var deviceRuntime *device.Runtime
 	dependencies.newDeviceRuntime = func(runtimeConfig device.RuntimeConfig) *device.Runtime {
 		runtimeConfig.Factory = func(ctx context.Context, _, _ string) (device.Client, error) {
 			backend.runtimeCtx = ctx
 			return backend, nil
 		}
-		return device.NewRuntime(runtimeConfig)
+		deviceRuntime = device.NewRuntime(runtimeConfig)
+		return deviceRuntime
 	}
 	ctx, cancel := context.WithCancel(t.Context())
 	var logs bytes.Buffer
@@ -103,9 +107,10 @@ func TestShutdownPhasesDoNotLetSlowServiceStarveFinalClearAndOutputJoin(t *testi
 		defer close(exited)
 		done <- run(ctx, Options{Version: "test", ConfigPath: configPath, SocketPath: filepath.Join(directory, "control.sock"), Stderr: &logs}, dependencies)
 	}()
+	releaseService := sync.OnceFunc(func() { close(plugins.releaseClose) })
 	releaseClear := sync.OnceFunc(func() { close(backend.releaseClear) })
 	t.Cleanup(func() {
-		close(plugins.abort)
+		releaseService()
 		releaseClear()
 		cancel()
 		select {
@@ -119,6 +124,12 @@ func TestShutdownPhasesDoNotLetSlowServiceStarveFinalClearAndOutputJoin(t *testi
 	case instance = <-plugins.applied:
 	case <-time.After(3 * time.Second):
 		t.Fatal("plugin configuration was not applied")
+	}
+	for deadline := time.Now().Add(3 * time.Second); deviceRuntime.Status().Phase != device.PhaseReady; {
+		if time.Now().After(deadline) {
+			t.Fatalf("device did not become ready: %#v", deviceRuntime.Status())
+		}
+		time.Sleep(time.Millisecond)
 	}
 	now := time.Now().UTC()
 	value := protocol.Observation{
@@ -145,6 +156,21 @@ func TestShutdownPhasesDoNotLetSlowServiceStarveFinalClearAndOutputJoin(t *testi
 		t.Fatal("daemon did not render the scene")
 	}
 	cancel()
+	select {
+	case <-plugins.closeStarted:
+	case err := <-done:
+		t.Fatalf("daemon exited before service shutdown started: %v", err)
+	case <-time.After(3 * time.Second):
+		t.Fatal("service shutdown did not start")
+	}
+	select {
+	case <-backend.clearing:
+		t.Fatal("device cleared before service shutdown finished")
+	case err := <-done:
+		t.Fatalf("daemon exited while service shutdown was blocked: %v", err)
+	default:
+	}
+	releaseService()
 	select {
 	case <-backend.clearing:
 	case err := <-done:
@@ -184,9 +210,10 @@ func TestShutdownPhasesDoNotLetSlowServiceStarveFinalClearAndOutputJoin(t *testi
 
 type slowShutdownRuntime struct {
 	fakePluginRuntime
-	callbacks pluginhost.Callbacks
-	applied   chan protocol.InstanceRef
-	abort     chan struct{}
+	callbacks    pluginhost.Callbacks
+	applied      chan protocol.InstanceRef
+	closeStarted chan struct{}
+	releaseClose chan struct{}
 }
 
 func (f *slowShutdownRuntime) Apply(_ context.Context, specs []pluginhost.Spec) error {
@@ -202,11 +229,16 @@ func (f *slowShutdownRuntime) Apply(_ context.Context, specs []pluginhost.Spec) 
 
 func (f *slowShutdownRuntime) Close(ctx context.Context) error {
 	select {
-	case <-ctx.Done():
-	case <-f.abort:
+	case f.closeStarted <- struct{}{}:
+	default:
 	}
-	f.callbacks.Log("resident", protocol.LogNotification{Level: protocol.LogLevelInfo, Event: "shutdown.finished", Message: "service shutdown finished"})
-	return ctx.Err()
+	select {
+	case <-f.releaseClose:
+		f.callbacks.Log("resident", protocol.LogNotification{Level: protocol.LogLevelInfo, Event: "shutdown.finished", Message: "service shutdown finished"})
+		return context.DeadlineExceeded
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 type shutdownDeviceClient struct {
