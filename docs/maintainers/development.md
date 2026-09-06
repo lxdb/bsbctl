@@ -24,7 +24,7 @@ This rebuilds the core and all configured local first-party plugins, including d
 To also add selected first-party apps, or build only the core:
 
 ```sh
-./install.sh --local --apps calendar,codex,codex-quota,mac-resources
+./install.sh --local --apps calendar,codex,codex-quota,github-notifications,mac-resources
 ./install.sh --local --apps none
 ```
 
@@ -108,11 +108,11 @@ Regenerate the publishable previews from the reviewed mock-only framebuffer fixt
 go run -tags preview ./cmd/previewgen --out docs/previews
 ```
 
-Without `--capture`, the generator never contacts a BUSY Bar or reads local provider configuration. It authenticates the reviewed 72x16 fixture bytes, then applies the official device frame and rounded LED presentation. It replaces all four outputs only after every artifact is valid and no larger than 1 MiB.
+Without `--capture`, the generator never contacts a BUSY Bar or reads local provider configuration. It authenticates the reviewed 72x16 framebuffer fixtures, then applies the official device frame and rounded LED presentation. It replaces all publishable preview outputs only after every artifact is valid and no larger than 1 MiB.
 
 Mock only provider inputs, timestamps, and user-safe labels. Build every preview through the plugin's production reducer, interaction, and scene-building paths. Do not hand-author a preview-only scene or duplicate production display text; a preview must match what the downloaded plugin publishes for the same inputs.
 
-After a production-scene change, explicitly render the mock-only Calendar, Codex, and Codex Quota scenes through the configured BUSY Bar, refresh their reviewed fixtures and checksums, and regenerate all four outputs:
+After a captured production-scene change, explicitly render the mock-only Calendar, Codex, Codex Quota, GitHub Notifications, and Slack scenes through the configured BUSY Bar, refresh their reviewed fixtures and checksums, and regenerate every publishable preview output. Mac Resources retains its reviewed framebuffer fixture:
 
 ```bash
 go run -tags preview ./cmd/previewgen --capture

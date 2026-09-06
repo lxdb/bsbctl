@@ -28,6 +28,8 @@ bsbctl setup --apps none --device-url http://192.0.2.10
 
 Setup rejects unknown or duplicate app IDs before making changes. Repeated runs preserve existing app settings and update only selected managed plugins. Setup restarts the LaunchAgent, even if its definition and binary version are unchanged.
 
+Apps that use provider credentials need a separate configuration step. For example, follow [GitHub Notifications setup](github-notifications.md#configure-the-app) after installing that app. Dedicated app setup changes the existing configuration through the running daemon; it does not install a package or restart the service.
+
 ## Device authentication
 
 If the BUSY Bar requires authentication, keep the credential in macOS Keychain. Do not put tokens in JSON configuration or command output.

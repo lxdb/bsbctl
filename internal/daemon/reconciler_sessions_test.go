@@ -198,8 +198,8 @@ func TestReconcilerActivatesExactSelectedObservationAndSuppressesOnlyItsRevision
 	if err := service.Load(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	activated, err := service.ActivateSelected(context.Background())
-	if err != nil || !activated {
+	activated, err := service.ActivateSelected(context.Background(), protocol.SessionInput{Button: &protocol.ButtonInput{Button: protocol.ButtonStart, Action: protocol.ButtonPress}})
+	if err != nil || !activated.Activated {
 		t.Fatalf("ActivateSelected = %v, %v", activated, err)
 	}
 	request := plugins.invoked
@@ -248,8 +248,8 @@ func TestReconcilerDoesNotActivateSelectedObservationWithoutDeclaredAction(t *te
 	if err := service.Load(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	activated, err := service.ActivateSelected(context.Background())
-	if err != nil || activated || plugins.invoked.InstanceID != "" {
+	activated, err := service.ActivateSelected(context.Background(), protocol.SessionInput{Button: &protocol.ButtonInput{Button: protocol.ButtonStart, Action: protocol.ButtonPress}})
+	if err != nil || activated.Activated || plugins.invoked.InstanceID != "" {
 		t.Fatalf("ActivateSelected/invocation = %v, %v, %#v", activated, err, plugins.invoked)
 	}
 }

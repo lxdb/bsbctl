@@ -15,3 +15,11 @@
 | LobeHub `lobe-icons` Codex artwork | MIT; OpenAI trademark terms also apply | [`LICENSES/lobehub-icons-MIT.txt`](LICENSES/lobehub-icons-MIT.txt) |
 
 Release archives include this notice and the complete `LICENSES/` directory. The development-only preview generator uses the BUSY Bar firmware frame, and generated files under `docs/previews/` incorporate that frame. The bundled transparent Codex artwork is derived from LobeHub commit `f07e9be35aef452ce735f95ea8204a14ecc513f7`; the [derived SVG](third_party/lobehub/codex-color-transparent.svg) records the removal of the white background path. OpenAI owns the Codex trademark and may impose separate brand-use conditions; neither the MIT license nor the bsbctl license grants trademark rights.
+
+## GitHub identity asset
+
+`plugins/githubnotifications/assets/github-mark.png` is a 16x16 raster canvas with the official white GitHub Invertocat supplied in the local GitHub logo package centered at 14x14. The mark retains its original proportions and colors. GitHub owns its trademarks; this asset identifies the integration and does not imply endorsement. It is not covered by this repository's code license.
+
+## Slack mark
+
+`plugins/slack/assets/slack-mark.png` is a 16-pixel raster of the official Slack mark supplied for this project. Slack and the Slack logo are trademarks of Slack Technologies, LLC. The mark identifies the Slack integration and does not imply endorsement.

@@ -69,13 +69,15 @@ func (*cleanupCaptureDisplay) Screen(context.Context, busylib.DisplayTarget) ([]
 	return nil, nil
 }
 
-func TestCaptureFixtureSetEncodesCompleteOpaqueCalendarCodexAndQuotaGIFs(t *testing.T) {
+func TestCaptureFixtureSetEncodesCompleteOpaqueDeviceRenderedGIFs(t *testing.T) {
 	clock := &fakeCaptureClock{value: time.Unix(0, 0)}
 	device := &fakeCaptureDisplay{clock: clock, animate: true}
 	scenarios := []previewScenario{
 		{Name: "Calendar", File: "calendar-front.gif", Capture: true, Steps: []previewStep{{Duration: 500 * time.Millisecond, Draw: busylib.DisplayElements{ApplicationName: "red"}}}, Duration: 500 * time.Millisecond},
 		{Name: "Codex", File: "codex-front.gif", Capture: true, Steps: []previewStep{{Duration: 500 * time.Millisecond, Draw: busylib.DisplayElements{ApplicationName: "green"}}}, Duration: 500 * time.Millisecond},
 		{Name: "Codex quota", File: "codex-quota-front.gif", Capture: true, Steps: []previewStep{{Duration: 500 * time.Millisecond, Draw: busylib.DisplayElements{ApplicationName: "blue"}}}, Duration: 500 * time.Millisecond},
+		{Name: "GitHub notifications", File: "github-notifications-front.gif", Capture: true, Steps: []previewStep{{Duration: 500 * time.Millisecond, Draw: busylib.DisplayElements{ApplicationName: "yellow"}}}, Duration: 500 * time.Millisecond},
+		{Name: "Slack", File: "slack-front.gif", Capture: true, Steps: []previewStep{{Duration: 500 * time.Millisecond, Draw: busylib.DisplayElements{ApplicationName: "purple"}}}, Duration: 500 * time.Millisecond},
 	}
 
 	fixtures, err := captureFixtureSet(
@@ -87,8 +89,8 @@ func TestCaptureFixtureSetEncodesCompleteOpaqueCalendarCodexAndQuotaGIFs(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(fixtures) != 3 {
-		t.Fatalf("captured fixture count = %d, want Calendar, Codex, and Codex quota", len(fixtures))
+	if len(fixtures) != len(capturedPreviewArtifactNames) {
+		t.Fatalf("captured fixture count = %d, want %d", len(fixtures), len(capturedPreviewArtifactNames))
 	}
 	for index, fixture := range fixtures {
 		if fixture.name != scenarios[index].File || fixture.format != "gif" {
@@ -127,6 +129,8 @@ func TestCaptureFixtureSetSelectsCapturedPreviewsIndependentOfScenarioOrder(t *t
 		{Name: "Codex quota", File: "codex-quota-front.gif", Capture: true, Steps: []previewStep{{Duration: 10 * time.Millisecond, Draw: busylib.DisplayElements{ApplicationName: "blue"}}}, Duration: 10 * time.Millisecond},
 		{Name: "Calendar", File: "calendar-front.gif", Capture: true, Steps: []previewStep{{Duration: 10 * time.Millisecond, Draw: busylib.DisplayElements{ApplicationName: "red"}}}, Duration: 10 * time.Millisecond},
 		{Name: "Codex", File: "codex-front.gif", Capture: true, SampleInterval: 300 * time.Millisecond, Steps: []previewStep{{Duration: 10 * time.Millisecond, Draw: busylib.DisplayElements{ApplicationName: "green"}}}, Duration: 10 * time.Millisecond},
+		{Name: "Slack", File: "slack-front.gif", Capture: true, Steps: []previewStep{{Duration: 10 * time.Millisecond, Draw: busylib.DisplayElements{ApplicationName: "purple"}}}, Duration: 10 * time.Millisecond},
+		{Name: "GitHub notifications", File: "github-notifications-front.gif", Capture: true, Steps: []previewStep{{Duration: 10 * time.Millisecond, Draw: busylib.DisplayElements{ApplicationName: "yellow"}}}, Duration: 10 * time.Millisecond},
 	}
 
 	fixtures, err := captureFixtureSet(t.Context(), device, scenarios, captureTiming{now: clock.Now, wait: clock.Wait})
@@ -137,13 +141,13 @@ func TestCaptureFixtureSetSelectsCapturedPreviewsIndependentOfScenarioOrder(t *t
 	for _, fixture := range fixtures {
 		got[fixture.name] = true
 	}
-	for _, name := range []string{"calendar-front.gif", "codex-front.gif", "codex-quota-front.gif"} {
+	for _, name := range capturedPreviewArtifactNames {
 		if !got[name] {
 			t.Errorf("captured fixtures %v do not include %s", got, name)
 		}
 	}
-	if got["mac-resources-front.gif"] || len(got) != 3 {
-		t.Fatalf("captured fixtures = %v, want only the three device-captured previews", got)
+	if got["mac-resources-front.gif"] || len(got) != len(capturedPreviewArtifactNames) {
+		t.Fatalf("captured fixtures = %v, want only the device-captured previews", got)
 	}
 }
 

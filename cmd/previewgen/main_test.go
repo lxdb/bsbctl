@@ -23,11 +23,7 @@ func TestRunCaptureGeneratesFixturesChecksumsAndPublishableArtifactsInOneCommand
 		&stdout,
 		&stderr,
 		runDependencies{capture: func(context.Context, options) ([]mockFixture, error) {
-			return []mockFixture{
-				{name: "calendar-front.gif", format: "gif", data: calendarFixtureGIF, sha256: digest},
-				{name: "codex-front.gif", format: "gif", data: calendarFixtureGIF, sha256: digest},
-				{name: "codex-quota-front.gif", format: "gif", data: calendarFixtureGIF, sha256: digest},
-			}, nil
+			return capturedPreviewCopies(digest), nil
 		}},
 	)
 	if err != nil {
@@ -36,7 +32,7 @@ func TestRunCaptureGeneratesFixturesChecksumsAndPublishableArtifactsInOneCommand
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
 	}
-	for _, name := range []string{"calendar-front.gif", "codex-front.gif", "codex-quota-front.gif"} {
+	for _, name := range capturedPreviewArtifactNames {
 		content, err := os.ReadFile(filepath.Join(fixtureDirectory, name))
 		if err != nil || !bytes.Equal(content, calendarFixtureGIF) {
 			t.Fatalf("captured fixture %s: content matches=%v err=%v", name, bytes.Equal(content, calendarFixtureGIF), err)
@@ -61,11 +57,7 @@ func TestRunCaptureDoesNotReplaceFixturesWhenPublicationValidationFails(t *testi
 		t.Fatal(err)
 	}
 	var stdout, stderr bytes.Buffer
-	captured := []mockFixture{
-		{name: "calendar-front.gif", format: "gif", data: calendarFixtureGIF, sha256: "8679489a91e3b1e1a163d5e5fee589caa0943d3e76619029e38ae2a539e4fb2f"},
-		{name: "codex-front.gif", format: "gif", data: calendarFixtureGIF, sha256: "8679489a91e3b1e1a163d5e5fee589caa0943d3e76619029e38ae2a539e4fb2f"},
-		{name: "codex-quota-front.gif", format: "gif", data: calendarFixtureGIF, sha256: "8679489a91e3b1e1a163d5e5fee589caa0943d3e76619029e38ae2a539e4fb2f"},
-	}
+	captured := capturedPreviewCopies(strings.TrimSpace(calendarFixtureSHA256))
 	err := runWithDependencies(
 		t.Context(),
 		[]string{"--capture", "--fixtures", fixtureDirectory, "--out", output},
@@ -103,11 +95,7 @@ func TestRunCaptureRollsBackFixturesWhenArtifactPublicationFails(t *testing.T) {
 		t.Fatal(err)
 	}
 	digest := strings.TrimSpace(calendarFixtureSHA256)
-	captured := []mockFixture{
-		{name: "calendar-front.gif", format: "gif", data: calendarFixtureGIF, sha256: digest},
-		{name: "codex-front.gif", format: "gif", data: calendarFixtureGIF, sha256: digest},
-		{name: "codex-quota-front.gif", format: "gif", data: calendarFixtureGIF, sha256: digest},
-	}
+	captured := capturedPreviewCopies(digest)
 	var stdout, stderr bytes.Buffer
 
 	err := runWithDependencies(
@@ -124,6 +112,14 @@ func TestRunCaptureRollsBackFixturesWhenArtifactPublicationFails(t *testing.T) {
 	if readErr != nil || string(content) != "existing" {
 		t.Fatalf("fixture after artifact output failure = %q, err=%v; want original content", content, readErr)
 	}
+}
+
+func capturedPreviewCopies(digest string) []mockFixture {
+	fixtures := make([]mockFixture, 0, len(capturedPreviewArtifactNames))
+	for _, name := range capturedPreviewArtifactNames {
+		fixtures = append(fixtures, mockFixture{name: name, format: "gif", data: calendarFixtureGIF, sha256: digest})
+	}
+	return fixtures
 }
 
 func TestRunGeneratesReviewedMockArtifactsWithoutReadingLiveConfiguration(t *testing.T) {

@@ -44,7 +44,7 @@ func TestReviewedMockFrameFixturesGenerateEveryPublishableArtifact(t *testing.T)
 	if len(artifacts) != len(previewArtifactNames) {
 		t.Fatalf("artifacts = %d, want %d", len(artifacts), len(previewArtifactNames))
 	}
-	for _, name := range []string{"calendar-front.gif", "codex-front.gif", "codex-quota-front.gif", "mac-resources-front.gif"} {
+	for _, name := range previewArtifactNames {
 		if len(artifacts[name]) > maximumPreviewBytes {
 			t.Fatalf("%s bytes = %d, want at most %d", name, len(artifacts[name]), maximumPreviewBytes)
 		}
@@ -55,13 +55,30 @@ func TestReviewedMockFrameFixturesGenerateEveryPublishableArtifact(t *testing.T)
 		if animation.Config.Width != 768 || animation.Config.Height != 248 || animation.LoopCount != 0 || len(animation.Image) < 2 {
 			t.Fatalf("%s has invalid publishable animation metadata", name)
 		}
-		if name == "codex-quota-front.gif" {
+		switch name {
+		case "codex-quota-front.gif":
 			duration := 0
 			for _, delay := range animation.Delay {
 				duration += delay
 			}
 			if len(animation.Image) != 2 || duration != 400 {
 				t.Fatalf("%s frames/duration = %d/%dcs, want two 2s quota states", name, len(animation.Image), duration)
+			}
+		case "github-notifications-front.gif":
+			duration := 0
+			for _, delay := range animation.Delay {
+				duration += delay
+			}
+			if len(animation.Image) < 20 || duration != 6000 {
+				t.Fatalf("%s frames/duration = %d/%dcs, want two animated 30s attention states", name, len(animation.Image), duration)
+			}
+		case "slack-front.gif":
+			duration := 0
+			for _, delay := range animation.Delay {
+				duration += delay
+			}
+			if len(animation.Image) < 20 || duration != 5400 {
+				t.Fatalf("%s frames/duration = %d/%dcs, want animated marquee scenes totaling 54s", name, len(animation.Image), duration)
 			}
 		}
 	}
@@ -98,10 +115,12 @@ func TestWriteArtifactsReplacesOnlyTheExpectedFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	artifacts := map[string][]byte{
-		"calendar-front.gif":      []byte("calendar"),
-		"codex-front.gif":         []byte("codex"),
-		"codex-quota-front.gif":   []byte("quota"),
-		"mac-resources-front.gif": []byte("resources"),
+		"calendar-front.gif":             []byte("calendar"),
+		"codex-front.gif":                []byte("codex"),
+		"codex-quota-front.gif":          []byte("quota"),
+		"github-notifications-front.gif": []byte("notifications"),
+		"mac-resources-front.gif":        []byte("resources"),
+		"slack-front.gif":                []byte("slack"),
 	}
 	if err := writeArtifacts(output, artifacts); err != nil {
 		t.Fatal(err)

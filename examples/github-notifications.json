@@ -1,0 +1,9 @@
+{
+  "config": {
+    "repositories": [],
+    "label": "GH",
+    "notification_reasons": "actionable",
+    "rear_details": false,
+    "poll_interval_seconds": 60
+  }
+}

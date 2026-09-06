@@ -42,7 +42,7 @@ The [release workflow](../.github/workflows/release.yml) is manually dispatched.
 
 Repository administrators must enforce protected tag creation and update controls for release tags. The workflow never creates or moves tags. It accepts lightweight or annotated tags and does not verify GPG or SSH tag signatures.
 
-Only the publish job has write permission. It uses artifacts from its own workflow run, reinspects both architectures, signs and verifies the catalog, then publishes the four plugin releases before core.
+Only the publish job has write permission. It uses artifacts from its own workflow run, reinspects both architectures, signs and verifies the catalog, then publishes all plugin releases before core.
 
 ## Verify the published result
 
@@ -64,7 +64,7 @@ Binaries are ad-hoc signed, not Developer ID signed or notarized. Artifact check
 
 ## Recover a partial publication
 
-GitHub cannot publish all five releases atomically. If publication fails, inspect the visible releases and rerun the same workflow with the same authenticated artifact set. It creates only missing drafts, uploads only missing exact assets, and verifies complete drafts before publishing.
+GitHub cannot publish all component releases atomically. If publication fails, inspect the visible releases and rerun the same workflow with the same authenticated artifact set. It creates only missing drafts, uploads only missing exact assets, and verifies complete drafts before publishing.
 
 Core is published last so its catalog cannot point to plugin releases that are still private. Do not move tags or replace published assets to bypass a mismatch. The installed binary fetches the catalog from its own core tag, not a moving latest URL.
 
@@ -77,6 +77,6 @@ soak_directory="$(mktemp -d)"
 go run ./cmd/releasectl soak --root . --output "$soak_directory/soak.jsonl"
 ```
 
-The soak uses the production daemon with Mac Resources and Codex Quota against loopback dependencies. After 10 seconds of warmup, it takes 12 samples at five-second intervals. Each must stay at or below 1.0 percent aggregate CPU and 100 MiB aggregate RSS. Invalid or missing telemetry fails the check; cleanup must remove the process tree and control socket.
+The soak uses the production daemon with Mac Resources and Codex Quota against loopback dependencies and runs the shipped GitHub Notifications and Slack processes with exact empty, unconfigured apps. After 10 seconds of warmup, it takes 12 samples at five-second intervals. Each must stay at or below 1.0 percent aggregate CPU and 100 MiB aggregate RSS. Invalid or missing telemetry fails the check; cleanup must remove the process tree and control socket. Separate deterministic package tests exercise configured provider behavior against injected local fixtures.
 
-Keep the JSONL, its SHA-256, source revision, toolchain, host, workload, and binary hashes. This verifies only that loopback run, not physical-device behavior, sleep/wake recovery, provider compatibility, or long-duration stability.
+Keep the JSONL, its SHA-256, source revision, toolchain, host, workload, and binary hashes. The process soak does not exercise a configured GitHub credential or provider collection. This verifies only that loopback run, not physical-device behavior, sleep/wake recovery, live provider compatibility, or long-duration stability.

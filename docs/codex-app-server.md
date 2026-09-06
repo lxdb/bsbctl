@@ -127,9 +127,9 @@ This replaces the full app definition. Retain every policy and launch action you
 
 ## Optional quota
 
-`show_quota=true` reads quota over the existing app-server connection at startup and every 120 seconds, with updates from provider notifications. Missing data is unavailable, not zero usage. Observations expire six minutes after the last provider update.
+`show_quota=true` reads quota over the existing app-server connection at startup and every 120 seconds, with updates from provider notifications. Missing data is unavailable, not zero usage. Summary observations expire six minutes after the last provider update. A transition into low or critical quota creates a 30-second pressure episode; unchanged pressure does not remain continuously eligible.
 
-Quota failures do not stop thread or approval monitoring. You can also use the standalone [Codex Quota app](codex-quota.md); installing both is supported.
+Quota failures do not stop thread or approval monitoring. You can also use the standalone [Codex Quota app](codex-quota.md). Both can remain enabled when app-server and the active standalone `auth.json` profile represent different accounts; when they represent the same account, their bounded threshold episodes and periodic summaries may overlap.
 
 ## List and pin sessions
 

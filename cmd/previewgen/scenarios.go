@@ -12,15 +12,21 @@ import (
 	"github.com/lxdb/bsbctl/plugins/calendar"
 	"github.com/lxdb/bsbctl/plugins/codex"
 	"github.com/lxdb/bsbctl/plugins/codexquota"
+	"github.com/lxdb/bsbctl/plugins/githubnotifications"
 	"github.com/lxdb/bsbctl/plugins/macresources"
+	"github.com/lxdb/bsbctl/plugins/slack"
 	"github.com/lxdb/bsbctl/sdk/protocol"
 	busylib "github.com/lxdb/busylib-go"
 )
 
 const (
-	previewApplication = "bsbctl-preview"
-	previewAssetPath   = "codex-mark.png"
-	previewAssetSource = "assets/codex-mark.png"
+	previewApplication       = "bsbctl-preview"
+	previewAssetPath         = "codex-mark.png"
+	previewAssetSource       = "assets/codex-mark.png"
+	githubPreviewAssetPath   = "github-mark.png"
+	githubPreviewAssetSource = "assets/github-mark.png"
+	slackPreviewAssetPath    = "slack-mark.png"
+	slackPreviewAssetSource  = "assets/slack-mark.png"
 )
 
 type previewStep struct {
@@ -41,6 +47,8 @@ var capturedPreviewArtifactNames = []string{
 	"calendar-front.gif",
 	"codex-front.gif",
 	"codex-quota-front.gif",
+	"github-notifications-front.gif",
+	"slack-front.gif",
 }
 
 func isCapturedPreviewArtifact(name string) bool {
@@ -63,7 +71,9 @@ func previewScenarios(now time.Time) ([]previewScenario, error) {
 		{name: "Calendar", file: "calendar-front.gif", capture: true, sampleInterval: 250 * time.Millisecond, scenes: calendar.PreviewScenes(now), durations: []time.Duration{6 * time.Second, 6 * time.Second, 2 * time.Second, 2 * time.Second, 2 * time.Second}},
 		{name: "Codex", file: "codex-front.gif", capture: true, sampleInterval: 300 * time.Millisecond, scenes: codexScenes, durations: repeatedDurations(len(codexScenes), 6*time.Second)},
 		{name: "Codex quota", file: "codex-quota-front.gif", capture: true, sampleInterval: 250 * time.Millisecond, scenes: codexquota.PreviewScenes(now), durations: []time.Duration{2 * time.Second, 2 * time.Second}},
+		{name: "GitHub notifications", file: "github-notifications-front.gif", capture: true, sampleInterval: 300 * time.Millisecond, scenes: githubnotifications.PreviewScenes(now), durations: []time.Duration{30 * time.Second, 30 * time.Second}},
 		{name: "Mac resources", file: "mac-resources-front.gif", sampleInterval: 250 * time.Millisecond, scenes: macresources.PreviewScenes(), durations: []time.Duration{2 * time.Second, 2 * time.Second, 2 * time.Second}},
+		{name: "Slack", file: "slack-front.gif", capture: true, sampleInterval: 250 * time.Millisecond, scenes: slack.PreviewScenes(now), durations: []time.Duration{2 * time.Second, 2 * time.Second, 8 * time.Second, 8 * time.Second, 18 * time.Second, 8 * time.Second, 2 * time.Second, 2 * time.Second, 2 * time.Second, 2 * time.Second}},
 	}
 	result := make([]previewScenario, 0, len(definitions))
 	for _, definition := range definitions {
@@ -74,7 +84,8 @@ func previewScenarios(now time.Time) ([]previewScenario, error) {
 		total := time.Duration(0)
 		for index, scene := range definition.scenes {
 			background := "#071522FF"
-			if definition.name == "Calendar" {
+			switch definition.name {
+			case "Calendar":
 				background = "#000000FF"
 			}
 			draw, err := compilePreviewScene(scene, background)
@@ -122,10 +133,16 @@ func compilePreviewScene(scene protocol.Scene, background string) (busylib.Displ
 		switch {
 		case element.Image != nil:
 			if element.Image.Asset.StockName == "" {
-				if element.Image.Asset.PackagePath != previewAssetSource {
+				switch element.Image.Asset.PackagePath {
+				case previewAssetSource:
+					element.Path = previewAssetPath
+				case githubPreviewAssetSource:
+					element.Path = githubPreviewAssetPath
+				case slackPreviewAssetSource:
+					element.Path = slackPreviewAssetPath
+				default:
 					return busylib.DisplayElements{}, fmt.Errorf("unsupported preview package asset %q", element.Image.Asset.PackagePath)
 				}
-				element.Path = previewAssetPath
 			} else {
 				element.Path = assets.StockPath(element.Image.Asset.StockName, "image")
 			}

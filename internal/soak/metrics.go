@@ -16,17 +16,21 @@ import (
 )
 
 const (
-	DaemonName              = "bsbctl"
-	CodexQuotaName          = "bsbctl-plugin-codex-quota"
-	MacResourcesName        = "bsbctl-plugin-mac-resources"
-	DefaultCPUPercent       = 1.0
-	DefaultRSSBytes   int64 = 100 << 20
+	DaemonName                    = "bsbctl"
+	CodexQuotaName                = "bsbctl-plugin-codex-quota"
+	GitHubNotificationsName       = "bsbctl-plugin-github-notifications"
+	MacResourcesName              = "bsbctl-plugin-mac-resources"
+	SlackName                     = "bsbctl-plugin-slack"
+	DefaultCPUPercent             = 1.0
+	DefaultRSSBytes         int64 = 100 << 20
 )
 
 var daemonProcessNames = map[string]struct{}{
-	DaemonName:       {},
-	CodexQuotaName:   {},
-	MacResourcesName: {},
+	DaemonName:              {},
+	CodexQuotaName:          {},
+	GitHubNotificationsName: {},
+	MacResourcesName:        {},
+	SlackName:               {},
 }
 
 type ProcessSnapshot struct {
@@ -162,12 +166,12 @@ func parseCPUTime(value string) (float64, error) {
 	return float64(days*24*60*60+hours*60*60+minutes*60) + seconds, nil
 }
 
-// SelectDaemonTree identifies exactly one bsbctl process and its exact two
+// SelectDaemonTree identifies exactly one bsbctl process and its exact set of
 // resident plugin children. Unrelated helper processes are ignored unless they
 // are direct children of the daemon, in which case accounting fails closed.
 func SelectDaemonTree(rows []ProcessSnapshot, parentPID int) ([]ProcessIdentity, error) {
 	var parent *ProcessSnapshot
-	children := make([]ProcessSnapshot, 0, 2)
+	children := make([]ProcessSnapshot, 0, len(daemonProcessNames)-1)
 	for index := range rows {
 		row := &rows[index]
 		if row.PID == parentPID {
@@ -180,8 +184,8 @@ func SelectDaemonTree(rows []ProcessSnapshot, parentPID int) ([]ProcessIdentity,
 	if parent == nil || parent.Name != DaemonName {
 		return nil, errors.New("bsbctl parent process telemetry is unavailable")
 	}
-	if len(children) != 2 {
-		return nil, fmt.Errorf("bsbctl has %d direct children, want exactly 2 resident plugins", len(children))
+	if len(children) != len(daemonProcessNames)-1 {
+		return nil, fmt.Errorf("bsbctl has %d direct children, want exactly %d resident plugins", len(children), len(daemonProcessNames)-1)
 	}
 	identities := []ProcessIdentity{{PID: parent.PID, PPID: parent.PPID, Name: parent.Name}}
 	seen := map[string]struct{}{DaemonName: {}}
@@ -198,8 +202,14 @@ func SelectDaemonTree(rows []ProcessSnapshot, parentPID int) ([]ProcessIdentity,
 	if _, ok := seen[CodexQuotaName]; !ok {
 		return nil, errors.New("Codex quota resident process telemetry is unavailable")
 	}
+	if _, ok := seen[GitHubNotificationsName]; !ok {
+		return nil, errors.New("GitHub Notifications resident process telemetry is unavailable")
+	}
 	if _, ok := seen[MacResourcesName]; !ok {
 		return nil, errors.New("Mac resources resident process telemetry is unavailable")
+	}
+	if _, ok := seen[SlackName]; !ok {
+		return nil, errors.New("Slack resident process telemetry is unavailable")
 	}
 	slices.SortFunc(identities, func(left, right ProcessIdentity) int { return cmp.Compare(left.Name, right.Name) })
 	return identities, nil

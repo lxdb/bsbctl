@@ -9,6 +9,8 @@ import (
 	"github.com/lxdb/bsbctl/sdk/protocol"
 )
 
+const quotaPressureVisibilityWindow = 30 * time.Second
+
 func (r *Reducer) Cards() []Card {
 	now := r.now().UTC()
 	if !r.connected {
@@ -107,14 +109,15 @@ func (r *Reducer) quotaCards(now time.Time) []Card {
 			Scene: codexusage.Scene(*r.quota, window, r.quotaOptions.Presentation, codexusage.SignalNone, r.quotaOptions.AssetPath),
 		})
 	}
-	signal := codexusage.SignalFor(*r.quota, r.quotaOptions.Presentation)
-	if signal == codexusage.SignalNone {
+	signal := r.quotaSignal
+	if signal == codexusage.SignalNone || !now.Before(r.quotaPressureUntil) {
 		return result
 	}
+	pressureUntil := min(validUntil, r.quotaPressureUntil)
 	pressure := Card{
 		Channel: ChannelQuotaPressure, Key: "quota",
-		Disposition: protocol.DispositionNotable, Impact: protocol.ImpactNotable, ReasonCode: "codex_quota_low",
-		ObservedAt: r.quota.UpdatedAt, ValidUntil: validUntil,
+		Disposition: protocol.DispositionNotable, Impact: protocol.ImpactLow, ReasonCode: "codex_quota_low",
+		ObservedAt: r.quota.UpdatedAt, ValidUntil: pressureUntil,
 		Scene: codexusage.Scene(*r.quota, codexusage.MostConstrained(*r.quota), r.quotaOptions.Presentation, signal, r.quotaOptions.AssetPath),
 	}
 	if signal == codexusage.SignalCritical {
@@ -123,6 +126,13 @@ func (r *Reducer) quotaCards(now time.Time) []Card {
 		pressure.ReasonCode = "codex_quota_critical"
 	}
 	return append(result, pressure)
+}
+
+func min(left, right time.Time) time.Time {
+	if left.Before(right) {
+		return left
+	}
+	return right
 }
 
 func (r *Reducer) LauncherCard() Card {

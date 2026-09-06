@@ -72,6 +72,86 @@ func TestReducerPublishesOptInQuotaAndMergesSparseUpdates(t *testing.T) {
 	}
 }
 
+func TestReducerQuotaPressureIsBriefAndRearmsOnlyOnSignalChange(t *testing.T) {
+	now := time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
+	reducer := NewReducerWithQuota(func() time.Time { return now }, QuotaOptions{
+		Enabled: true,
+		Presentation: codexusage.PresentationConfig{
+			WarningRemainingPercent:  20,
+			CriticalRemainingPercent: 5,
+		},
+	})
+	reducer.Apply(appserver.ManagerEvent{Kind: appserver.ManagerConnected})
+	reducer.Apply(appserver.ManagerEvent{Kind: appserver.ManagerRateLimitsSnapshot, RateLimits: &appserver.RateLimitSnapshot{
+		LimitID: "codex",
+		Primary: &appserver.RateLimitWindow{UsedPercent: 85, WindowDurationMinutes: 300, ResetsAt: now.Add(time.Hour).Unix()},
+	}})
+	pressure := findCard(t, reducer.Cards(), ChannelQuotaPressure, "quota")
+	if pressure.Impact != protocol.ImpactLow {
+		t.Fatalf("low quota impact = %q, want low", pressure.Impact)
+	}
+	firstUntil := pressure.ValidUntil
+
+	now = now.Add(10 * time.Second)
+	reducer.Apply(appserver.ManagerEvent{Kind: appserver.ManagerIncoming, Incoming: appserver.Incoming{
+		Kind: appserver.IncomingNotification, Method: "account/rateLimits/updated",
+		Params: json.RawMessage(`{"rateLimits":{"limitId":"codex","primary":{"usedPercent":86}}}`),
+	}})
+	if got := findCard(t, reducer.Cards(), ChannelQuotaPressure, "quota").ValidUntil; !got.Equal(firstUntil) {
+		t.Fatalf("same low signal renewed pressure until %v, want %v", got, firstUntil)
+	}
+	now = firstUntil
+	if hasCard(reducer.Cards(), ChannelQuotaPressure, "quota") {
+		t.Fatal("unchanged low quota remained continuously eligible")
+	}
+
+	reducer.Apply(appserver.ManagerEvent{Kind: appserver.ManagerIncoming, Incoming: appserver.Incoming{
+		Kind: appserver.IncomingNotification, Method: "account/rateLimits/updated",
+		Params: json.RawMessage(`{"rateLimits":{"limitId":"codex","primary":{"usedPercent":96}}}`),
+	}})
+	critical := findCard(t, reducer.Cards(), ChannelQuotaPressure, "quota")
+	if critical.Disposition != protocol.DispositionActionable || critical.Impact != protocol.ImpactCritical || !critical.ValidUntil.After(now) {
+		t.Fatalf("critical transition = %#v", critical)
+	}
+}
+
+func TestNormalAppServerOutcomeOutranksLowQuotaEpisode(t *testing.T) {
+	now := time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
+	reducer := NewReducerWithQuota(func() time.Time { return now }, QuotaOptions{
+		Enabled: true,
+		Presentation: codexusage.PresentationConfig{
+			WarningRemainingPercent:  20,
+			CriticalRemainingPercent: 5,
+		},
+	})
+	reducer.Apply(appserver.ManagerEvent{Kind: appserver.ManagerConnected})
+	reducer.Apply(appserver.ManagerEvent{Kind: appserver.ManagerRateLimitsSnapshot, RateLimits: &appserver.RateLimitSnapshot{
+		LimitID: "codex",
+		Primary: &appserver.RateLimitWindow{UsedPercent: 85, WindowDurationMinutes: 300, ResetsAt: now.Add(time.Hour).Unix()},
+	}})
+	pressure := findCard(t, reducer.Cards(), ChannelQuotaPressure, "quota")
+	outcome := Card{
+		Channel: ChannelOutcome, Key: "outcome", Disposition: protocol.DispositionNotable, Impact: protocol.ImpactNormal,
+		ReasonCode: "codex_completed", ObservedAt: now, ValidUntil: now.Add(30 * time.Second), Scene: protocol.Scene{Elements: []protocol.Element{{
+			ID: "state", Display: protocol.DisplayFront, Text: &protocol.TextElement{Value: "DONE", Font: "tiny"},
+		}}},
+	}
+	records := make([]observation.Record, 0, 2)
+	for index, card := range []Card{pressure, outcome} {
+		records = append(records, observation.Record{PluginID: PluginID, Generation: 1, AdmissionSequence: uint64(index + 1), Observation: protocol.Observation{
+			Instance: protocol.InstanceRef{ID: AppID, Generation: 1}, Channel: card.Channel, Key: card.Key, Revision: 1,
+			Disposition: card.Disposition, Impact: card.Impact, ReasonCode: card.ReasonCode,
+			ObservedAt: card.ObservedAt, UpdatedAt: now, ValidUntil: card.ValidUntil, Scene: new(cardScene(card)),
+		}})
+	}
+	decision := attention.Select(records, func(observation.Record) (attention.Rule, bool) {
+		return attention.Rule{Enabled: true, AssetsReady: true, Policy: presentation.PolicyWhenRelevant}, true
+	}, presentation.History{LastShown: map[string]time.Time{}}, now)
+	if decision.Candidate == nil || decision.Candidate.Channel != ChannelOutcome {
+		t.Fatalf("selected = %#v, evaluations = %#v", decision.Candidate, decision.Evaluations)
+	}
+}
+
 func TestQuotaReadFailuresAndUnrelatedEventsDoNotRenewFreshness(t *testing.T) {
 	now := time.Date(2026, 9, 5, 12, 0, 0, 0, time.UTC)
 	reducer := NewReducerWithQuota(func() time.Time { return now }, QuotaOptions{Enabled: true})

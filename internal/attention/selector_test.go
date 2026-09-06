@@ -58,6 +58,29 @@ func TestSelectRotationReportsExactNextDueAndNotDueReason(t *testing.T) {
 	}
 }
 
+func TestSelectCurrentRotationYieldsAfterReadableHold(t *testing.T) {
+	shownAt := time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
+	rotation := record("rotation", protocol.DispositionNotable, protocol.ImpactNormal, shownAt)
+	resolve := func(observation.Record) (Rule, bool) {
+		return Rule{Enabled: true, AssetsReady: true, Policy: presentation.PolicyRotation, RotationIntervalMS: 60_000}, true
+	}
+	history := presentation.History{
+		CurrentID: rotation.ID(), CurrentSince: shownAt,
+		LastShown: map[string]time.Time{rotation.ID(): shownAt},
+	}
+	if decision := Select([]observation.Record{rotation}, resolve, history, shownAt.Add(7*time.Second)); decision.Candidate == nil {
+		t.Fatal("current rotation did not receive its readable hold")
+	}
+	decision := Select([]observation.Record{rotation}, resolve, history, shownAt.Add(8*time.Second))
+	if decision.Candidate != nil {
+		t.Fatalf("rotation remained resident after hold: %#v", decision.Candidate)
+	}
+	evaluation := evaluationFor(decision.Evaluations, rotation.ID())
+	if evaluation.Reason != ReasonNotDue || !evaluation.NextDue.Equal(shownAt.Add(time.Minute)) {
+		t.Fatalf("evaluation = %#v", evaluation)
+	}
+}
+
 func TestSelectRotationJitterIsDeterministicIdentityBasedAndBounded(t *testing.T) {
 	shownAt := time.Date(2026, 8, 21, 6, 0, 0, 0, time.UTC)
 	first := record("first", protocol.DispositionNotable, protocol.ImpactNormal, shownAt)

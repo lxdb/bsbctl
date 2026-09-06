@@ -20,7 +20,9 @@ func TestRunReleaseTagsEmitsEveryValidatedTagAsFetchRefspec(t *testing.T) {
 		"refs/tags/plugin/calendar/v0.1.0:refs/tags/plugin/calendar/v0.1.0",
 		"refs/tags/plugin/codex/v0.1.0:refs/tags/plugin/codex/v0.1.0",
 		"refs/tags/plugin/codex-quota/v0.1.0:refs/tags/plugin/codex-quota/v0.1.0",
+		"refs/tags/plugin/github-notifications/v0.1.0:refs/tags/plugin/github-notifications/v0.1.0",
 		"refs/tags/plugin/mac-resources/v0.1.0:refs/tags/plugin/mac-resources/v0.1.0",
+		"refs/tags/plugin/slack/v0.1.0:refs/tags/plugin/slack/v0.1.0",
 	}
 	if got := strings.Fields(stdout.String()); !reflect.DeepEqual(got, want) {
 		t.Fatalf("release tag refspecs = %q, want %q", got, want)

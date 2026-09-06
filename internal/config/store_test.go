@@ -717,3 +717,36 @@ func TestDocumentRejectsUnboundedPluginAndAppCollections(t *testing.T) {
 		t.Fatalf("app capacity error = %v", err)
 	}
 }
+
+func TestActivationInputPersistsAndRequiresAction(t *testing.T) {
+	for _, tc := range []struct {
+		input, action string
+		valid         bool
+	}{{"", "", true}, {"start", "open", true}, {"start_or_encoder", "open", true}, {"start_or_encoder", "", false}, {"start", "", false}, {"ok", "open", false}} {
+		t.Run(tc.input+"/"+tc.action, func(t *testing.T) {
+			d := validDocument()
+			app := d.Apps["ball8"]
+			p := app.Policies["answer"]
+			p.ActivationInput = tc.input
+			p.ActivationAction = tc.action
+			app.Policies["answer"] = p
+			d.Apps["ball8"] = app
+			if err := d.Validate(); (err == nil) != tc.valid {
+				t.Fatalf("Validate = %v", err)
+			}
+			if tc.valid {
+				store := NewStore(filepath.Join(t.TempDir(), "config.json"))
+				if _, err := store.ReplaceWithOutcome(0, d); err != nil {
+					t.Fatal(err)
+				}
+				loaded, err := store.Load()
+				if err != nil {
+					t.Fatal(err)
+				}
+				if loaded.Apps["ball8"].Policies["answer"].ActivationInput != tc.input {
+					t.Fatal("activation input lost in persistence")
+				}
+			}
+		})
+	}
+}

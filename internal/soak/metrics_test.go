@@ -12,12 +12,14 @@ func TestSelectDaemonTreeRequiresExactParentAndResidentChildren(t *testing.T) {
 101 1 0:00.10 12000 /private/tmp/soak/bsbctl
 102 101 0:00.02 8000 /private/tmp/soak/bsbctl-plugin-mac-resources
 103 101 0:00.03 9000 /private/tmp/soak/bsbctl-plugin-codex-quota
+105 101 0:00.01 7000 /private/tmp/soak/bsbctl-plugin-github-notifications
+106 101 0:00.01 7000 /private/tmp/soak/bsbctl-plugin-slack
 104 999 0:00.01 7000 /private/tmp/soak/releasectl
 `))
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantNames := []string{"bsbctl", "bsbctl-plugin-codex-quota", "bsbctl-plugin-mac-resources"}
+	wantNames := []string{"bsbctl", "bsbctl-plugin-codex-quota", "bsbctl-plugin-github-notifications", "bsbctl-plugin-mac-resources", "bsbctl-plugin-slack"}
 	identities, err := SelectDaemonTree(rows, 101)
 	if err != nil {
 		t.Fatal(err)
@@ -37,7 +39,9 @@ func TestSelectDaemonTreeRequiresExactParentAndResidentChildren(t *testing.T) {
 		"unexpected child": `101 1 0:00.10 12000 /tmp/bsbctl
 102 101 0:00.02 8000 /tmp/bsbctl-plugin-mac-resources
 103 101 0:00.03 9000 /tmp/bsbctl-plugin-codex-quota
-105 101 0:00.01 1000 /tmp/unexpected-helper`,
+105 101 0:00.01 7000 /tmp/bsbctl-plugin-github-notifications
+106 101 0:00.01 7000 /tmp/bsbctl-plugin-slack
+107 101 0:00.01 1000 /tmp/unexpected-helper`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			rows, err := ParseProcessSnapshot(strings.NewReader(raw))
@@ -57,6 +61,8 @@ func TestMeasureIntervalReportsEveryProcessAndAggregate(t *testing.T) {
 101 1 0:00.10 12000 /tmp/bsbctl
 102 101 0:00.02 8000 /tmp/bsbctl-plugin-mac-resources
 103 101 0:00.03 9000 /tmp/bsbctl-plugin-codex-quota
+104 101 0:00.01 7000 /tmp/bsbctl-plugin-github-notifications
+105 101 0:00.01 7000 /tmp/bsbctl-plugin-slack
 `))
 	if err != nil {
 		t.Fatal(err)
@@ -65,6 +71,8 @@ func TestMeasureIntervalReportsEveryProcessAndAggregate(t *testing.T) {
 101 1 0:00.11 12100 /tmp/bsbctl
 102 101 0:00.02 8100 /tmp/bsbctl-plugin-mac-resources
 103 101 0:00.04 9200 /tmp/bsbctl-plugin-codex-quota
+104 101 0:00.01 7100 /tmp/bsbctl-plugin-github-notifications
+105 101 0:00.01 7100 /tmp/bsbctl-plugin-slack
 `))
 	if err != nil {
 		t.Fatal(err)
@@ -78,13 +86,13 @@ func TestMeasureIntervalReportsEveryProcessAndAggregate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(sample.Processes) != 3 {
+	if len(sample.Processes) != 5 {
 		t.Fatalf("process count = %d", len(sample.Processes))
 	}
 	if got := sample.AggregateCPUPercent; got < 0.999 || got > 1.001 {
 		t.Fatalf("aggregate CPU = %f, want 1.0", got)
 	}
-	if got, want := sample.AggregateRSSBytes, int64((12100+8100+9200)*1024); got != want {
+	if got, want := sample.AggregateRSSBytes, int64((12100+8100+9200+7100+7100)*1024); got != want {
 		t.Fatalf("aggregate RSS = %d, want %d", got, want)
 	}
 	if got := sample.Processes[0].CPUPercent; got < 0.499 || got > 0.501 {
@@ -98,6 +106,8 @@ func TestMeasureIntervalRejectsUnavailableOrRegressedTelemetry(t *testing.T) {
 101 1 0:01.00 12000 /tmp/bsbctl
 102 101 0:00.02 8000 /tmp/bsbctl-plugin-mac-resources
 103 101 0:00.03 9000 /tmp/bsbctl-plugin-codex-quota
+104 101 0:00.01 7000 /tmp/bsbctl-plugin-github-notifications
+105 101 0:00.01 7000 /tmp/bsbctl-plugin-slack
 `))
 	if err != nil {
 		t.Fatal(err)
@@ -107,20 +117,22 @@ func TestMeasureIntervalRejectsUnavailableOrRegressedTelemetry(t *testing.T) {
 		t.Fatal(err)
 	}
 	start := time.Now()
-	for name, raw := range map[string]string{
-		"missing process": `101 1 0:01.01 12000 /tmp/bsbctl
-102 101 0:00.02 8000 /tmp/bsbctl-plugin-mac-resources`,
-		"cpu regressed": `101 1 0:00.99 12000 /tmp/bsbctl
+	for _, test := range []struct{ name, raw, want string }{
+		{"missing process", `101 1 0:01.01 12000 /tmp/bsbctl
+102 101 0:00.02 8000 /tmp/bsbctl-plugin-mac-resources`, "process telemetry is unavailable"},
+		{"cpu regressed", `101 1 0:00.99 12000 /tmp/bsbctl
 102 101 0:00.02 8000 /tmp/bsbctl-plugin-mac-resources
-103 101 0:00.03 9000 /tmp/bsbctl-plugin-codex-quota`,
+103 101 0:00.03 9000 /tmp/bsbctl-plugin-codex-quota
+104 101 0:00.01 7000 /tmp/bsbctl-plugin-github-notifications
+105 101 0:00.01 7000 /tmp/bsbctl-plugin-slack`, "cpu telemetry regressed for bsbctl"},
 	} {
-		t.Run(name, func(t *testing.T) {
-			after, err := ParseProcessSnapshot(strings.NewReader(raw))
+		t.Run(test.name, func(t *testing.T) {
+			after, err := ParseProcessSnapshot(strings.NewReader(test.raw))
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := MeasureInterval(1, start, start.Add(time.Second), identities, before, after); err == nil {
-				t.Fatal("MeasureInterval unexpectedly treated unavailable telemetry as zero")
+			if _, err := MeasureInterval(1, start, start.Add(time.Second), identities, before, after); err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("MeasureInterval error = %v, want %q", err, test.want)
 			}
 		})
 	}

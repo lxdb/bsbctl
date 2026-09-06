@@ -8,7 +8,10 @@ import (
 	"github.com/lxdb/bsbctl/internal/presentation"
 	"github.com/lxdb/bsbctl/plugins/calendar"
 	"github.com/lxdb/bsbctl/plugins/codexquota"
+	"github.com/lxdb/bsbctl/plugins/githubnotifications"
 	"github.com/lxdb/bsbctl/plugins/macresources"
+	"github.com/lxdb/bsbctl/plugins/slack"
+	pluginsdk "github.com/lxdb/bsbctl/sdk/plugin"
 	"github.com/lxdb/bsbctl/sdk/protocol"
 )
 
@@ -32,15 +35,19 @@ func TestRegistryOwnsEveryFirstPartyPluginIdentity(t *testing.T) {
 		"dev.bsbctl.calendar",
 		"dev.bsbctl.codex",
 		"dev.bsbctl.codex-quota",
+		"dev.bsbctl.github-notifications",
 		"dev.bsbctl.mac-resources",
+		"dev.bsbctl.slack",
 	}
 	wantBinaries := []string{
 		"bsbctl-plugin-calendar",
 		"bsbctl-plugin-codex",
 		"bsbctl-plugin-codex-quota",
+		"bsbctl-plugin-github-notifications",
 		"bsbctl-plugin-mac-resources",
+		"bsbctl-plugin-slack",
 	}
-	wantAppIDs := []string{"calendar", "codex", "codex-quota", "mac-resources"}
+	wantAppIDs := []string{"calendar", "codex", "codex-quota", "github-notifications", "mac-resources", "slack"}
 	descriptors := All()
 	ids := make([]string, len(descriptors))
 	binaries := make([]string, len(descriptors))
@@ -101,6 +108,63 @@ func TestRegistryOwnsEveryFirstPartyPluginIdentity(t *testing.T) {
 	}
 	if _, ok := LookupAppID("unknown"); ok {
 		t.Fatal("unknown default app was found")
+	}
+}
+
+func TestGitHubNotificationsDefaultUsesExactDeliveryPolicies(t *testing.T) {
+	t.Parallel()
+	descriptor, ok := LookupID(githubnotifications.PluginID)
+	if !ok {
+		t.Fatal("GitHub Notifications descriptor not found")
+	}
+	if descriptor.DefaultApp.ID != "github-notifications" || descriptor.Binary != "bsbctl-plugin-github-notifications" || string(descriptor.DefaultApp.Config) != `{}` || len(descriptor.DefaultApp.Secrets) != 0 || descriptor.DefaultApp.LaunchAction != "open" {
+		t.Fatalf("GitHub Notifications delivery metadata = %#v", descriptor)
+	}
+	want := map[string]presentation.PolicyConfig{
+
+		githubnotifications.ChannelAttention: {
+			Policy: presentation.PolicyAttention, ActivationAction: "open", ActivationInput: "start_or_encoder", RequiresAck: true,
+		},
+		githubnotifications.ChannelConnection: {Policy: presentation.PolicyWhenRelevant, ActivationAction: "open"},
+		githubnotifications.ChannelLive:       {Policy: presentation.PolicyInteractive},
+	}
+	if !reflect.DeepEqual(descriptor.DefaultApp.Policies, want) {
+		t.Fatalf("GitHub Notifications policies = %#v, want %#v", descriptor.DefaultApp.Policies, want)
+	}
+}
+
+func TestSlackDefaultIsStrictlyUnconfiguredWithCompletePolicies(t *testing.T) {
+	t.Parallel()
+	descriptor, ok := LookupID(slack.PluginID)
+	if !ok {
+		t.Fatal("Slack descriptor not found")
+	}
+	if string(descriptor.DefaultApp.Config) != `{}` || len(descriptor.DefaultApp.Secrets) != 0 || descriptor.DefaultApp.LaunchAction != "open" {
+		t.Fatalf("Slack default app = %#v", descriptor.DefaultApp)
+	}
+	want := map[string]presentation.PolicyConfig{
+		slack.ChannelAttention:  {Policy: presentation.PolicyAttention, RequiresAck: true, ActivationAction: "open", ActivationInput: "start_or_encoder"},
+		slack.ChannelConnection: {Policy: presentation.PolicyWhenRelevant, ActivationAction: "open"},
+		slack.ChannelLive:       {Policy: presentation.PolicyInteractive},
+	}
+	if !reflect.DeepEqual(descriptor.DefaultApp.Policies, want) {
+		t.Fatalf("Slack default policies = %#v, want %#v", descriptor.DefaultApp.Policies, want)
+	}
+	wantContract := pluginsdk.Contract{
+		ExecutionModes: []protocol.ExecutionMode{protocol.ExecutionModeResident, protocol.ExecutionModeInteractive},
+		Channels: []protocol.Channel{
+			{ID: slack.ChannelSummary},
+			{ID: slack.ChannelAttention},
+			{ID: slack.ChannelConnection},
+			{ID: slack.ChannelLive},
+		},
+		Operations: []protocol.OperationDescriptor{
+			{ID: "status", Kind: protocol.OperationQuery},
+			{ID: "items", Kind: protocol.OperationQuery},
+		},
+	}
+	if got := descriptor.DefinitionForVersion("0.1.0").Contract; !reflect.DeepEqual(got, wantContract) {
+		t.Fatalf("Slack manifest contract = %#v, want %#v", got, wantContract)
 	}
 }
 

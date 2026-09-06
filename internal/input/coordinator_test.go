@@ -15,11 +15,16 @@ type coordinatorActivator struct {
 	calls     int
 	activated bool
 	err       error
+	target    SessionTarget
+	activate  func()
 }
 
-func (a *coordinatorActivator) ActivateSelected(context.Context) (bool, error) {
+func (a *coordinatorActivator) ActivateSelected(context.Context, protocol.SessionInput) (ActivationResult, error) {
 	a.calls++
-	return a.activated, a.err
+	if a.activate != nil {
+		a.activate()
+	}
+	return ActivationResult{Activated: a.activated, InputTarget: a.target}, a.err
 }
 
 type coordinatorSessions struct {
@@ -120,7 +125,7 @@ func TestCoordinatorDirectStartActivatesSelectedObservationWithoutSessionInput(t
 	}
 }
 
-func TestCoordinatorStartActivatesRenderedObservationBeforeForegroundSession(t *testing.T) {
+func TestCoordinatorStartStaysWithExistingForegroundSession(t *testing.T) {
 	router := NewRouter(&fakeLauncher{}, func(protocol.Observation) error { return nil }, func() {}, time.Now)
 	sessions := &coordinatorSessions{instance: "codex", token: "session-7"}
 	activator := &coordinatorActivator{activated: true}
@@ -133,8 +138,8 @@ func TestCoordinatorStartActivatesRenderedObservationBeforeForegroundSession(t *
 	if err := coordinator.Handle(context.Background(), buttonPress(inputpb.Button_START)); err != nil {
 		t.Fatal(err)
 	}
-	if activator.calls != 1 || len(published) != 0 {
-		t.Fatalf("activation/published = %d/%d, want rendered card activation only", activator.calls, len(published))
+	if activator.calls != 0 || len(published) != 1 || published[0].target.Token != "session-7" {
+		t.Fatalf("foreground input retargeted: activation=%d published=%+v", activator.calls, published)
 	}
 }
 
@@ -367,7 +372,7 @@ func TestCoordinatorBackReleaseDoesNotInvokePluginOrFallback(t *testing.T) {
 	}
 }
 
-func TestCoordinatorStartFallsBackToExactForegroundWhenNoObservationActivates(t *testing.T) {
+func TestCoordinatorStartDoesNotConsultAmbientObservationWithForeground(t *testing.T) {
 	router := NewRouter(&fakeLauncher{}, func(protocol.Observation) error { return nil }, func() {}, time.Now)
 	sessions := &coordinatorSessions{instance: "codex", token: "session-7"}
 	activator := &coordinatorActivator{}
@@ -380,7 +385,7 @@ func TestCoordinatorStartFallsBackToExactForegroundWhenNoObservationActivates(t 
 	if err := coordinator.Handle(context.Background(), buttonPress(inputpb.Button_START)); err != nil {
 		t.Fatal(err)
 	}
-	if activator.calls != 1 || len(published) != 1 || published[0].target != (SessionTarget{InstanceID: "codex", Token: "session-7"}) {
+	if activator.calls != 0 || len(published) != 1 || published[0].target != (SessionTarget{InstanceID: "codex", Token: "session-7"}) {
 		t.Fatalf("activation/published = %d/%#v, want exact foreground fallback", activator.calls, published)
 	}
 }
@@ -449,3 +454,43 @@ func (l *admissionInvalidatingLauncher) Apps() []App {
 }
 
 func (*admissionInvalidatingLauncher) Launch(context.Context, string, string) error { return nil }
+
+func TestCoordinatorForwardsOriginalActivationPressOnlyToReturnedSession(t *testing.T) {
+	occurred := time.Date(2026, 9, 5, 10, 0, 0, 0, time.UTC)
+	now := occurred
+	for _, tc := range []struct {
+		name        string
+		replacement bool
+	}{
+		{name: "promoted session receives activation press"},
+		{name: "replacement session cannot receive activation press", replacement: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			sessions := &coordinatorSessions{}
+			activator := &coordinatorActivator{activated: true, target: SessionTarget{InstanceID: "gh", Token: "promoted"}, activate: func() {
+				now = occurred.Add(time.Second)
+				sessions.instance = "gh"
+				sessions.token = "promoted"
+				if tc.replacement {
+					sessions.instance = "codex"
+					sessions.token = "replacement"
+				}
+			}}
+			calls := 0
+			c := NewCoordinator(nil, activator, sessions, func(id, token string, payload protocol.SessionInput, at time.Time) error {
+				calls++
+				if id != "gh" || token != "promoted" || at != occurred || payload.Button == nil || payload.Button.Button != protocol.ButtonStart || payload.Button.Action != protocol.ButtonPress {
+					t.Fatalf("retargeted or synthesized input: %s/%s %#v %v", id, token, payload, at)
+				}
+				return nil
+			}, testBackHandling(nil, nil, nil), nil, nil, func() time.Time { return now })
+			now = occurred
+			if err := c.Handle(t.Context(), buttonPress(inputpb.Button_START)); err != nil {
+				t.Fatal(err)
+			}
+			if activator.calls != 1 || calls != 1 {
+				t.Fatalf("activation calls = %d, forwarded presses = %d", activator.calls, calls)
+			}
+		})
+	}
+}

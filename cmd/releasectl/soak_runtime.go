@@ -73,12 +73,12 @@ func executeSoak(ctx context.Context, options soakOptions) (result soakEvidence,
 	environment := soakRuntimeEnvironment(home, codexHome)
 	configPath := filepath.Join(temporary, "config.json")
 	socketPath := filepath.Join(temporary, "bsbctl.sock")
-	if _, err := commandText(ctx, options.Root, environment, paths[soak.DaemonName],
-		"init", "--config", configPath,
-		"--plugin", paths[soak.MacResourcesName],
-		"--plugin", paths[soak.CodexQuotaName],
-		"--device-url", fake.URL(),
-	); err != nil {
+	initArguments := []string{"init", "--config", configPath}
+	for _, descriptor := range releaseSoakPluginDescriptors() {
+		initArguments = append(initArguments, "--plugin", paths[descriptor.Binary])
+	}
+	initArguments = append(initArguments, "--device-url", fake.URL())
+	if _, err := commandText(ctx, options.Root, environment, paths[soak.DaemonName], initArguments...); err != nil {
 		return soakEvidence{}, fmt.Errorf("initialize production-shaped config: %w", err)
 	}
 
@@ -102,23 +102,33 @@ func executeSoak(ctx context.Context, options soakOptions) (result soakEvidence,
 	cancelControl()
 	macAppPath := filepath.Join(temporary, "mac-resources-app.json")
 	quotaAppPath := filepath.Join(temporary, "codex-quota-app.json")
+	githubAppPath := filepath.Join(temporary, "github-notifications-app.json")
 	if err := os.WriteFile(macAppPath, []byte(`{"config":{},"policies":{"summary":{"policy":"rotation","rotation_interval_ms":60000},"pressure":{"policy":"when_relevant"}}}`), 0o600); err != nil {
 		return soakEvidence{}, errors.New("write synthetic Mac resources app configuration")
 	}
 	if err := os.WriteFile(quotaAppPath, []byte(`{"config":{"credentials_home":"`+codexHome+`","configuration_home":"`+codexHome+`","label":"MAIN","badge":"M"},"policies":{"summary":{"policy":"rotation","rotation_interval_ms":300000},"pressure":{"policy":"when_relevant"}}}`), 0o600); err != nil {
 		return soakEvidence{}, errors.New("write synthetic Codex quota app configuration")
 	}
+	if err := os.WriteFile(githubAppPath, []byte(`{"config":{},"launch_action":"open","policies":{"summary":{"policy":"rotation","activation_action":"open","rotation_interval_ms":60000,"rotation_jitter_percent":10},"attention":{"policy":"attention","activation_action":"open","activation_input":"start","requires_ack":true},"connection":{"policy":"when_relevant","activation_action":"open"},"live":{"policy":"interactive"}}}`), 0o600); err != nil {
+		return soakEvidence{}, errors.New("write synthetic unconfigured GitHub Notifications app configuration")
+	}
 	for _, app := range []struct {
 		id, pluginID, path string
 	}{
 		{"mac-resources", "dev.bsbctl.mac-resources", macAppPath},
 		{"codex-quota", "dev.bsbctl.codex-quota", quotaAppPath},
+		{"github-notifications", "dev.bsbctl.github-notifications", githubAppPath},
 	} {
 		if _, err := commandText(ctx, options.Root, environment, paths[soak.DaemonName],
 			"app", "create", app.id, "--plugin", app.pluginID, "--file", app.path, "--socket", socketPath,
 		); err != nil {
 			return soakEvidence{}, fmt.Errorf("create synthetic %s app: %w", app.id, err)
 		}
+	}
+	if _, err := commandText(ctx, options.Root, environment, paths[soak.DaemonName],
+		"app", "create", "slack", "--socket", socketPath,
+	); err != nil {
+		return soakEvidence{}, fmt.Errorf("create unconfigured Slack app: %w", err)
 	}
 	readyCtx, cancelReady := context.WithTimeout(ctx, options.StartupTimeout)
 	status, readyIdentities, err := awaitSoakReadiness(readyCtx, options.Root, environment, paths[soak.DaemonName], socketPath, daemonProcess, fake)
@@ -137,10 +147,12 @@ func executeSoak(ctx context.Context, options soakOptions) (result soakEvidence,
 				GOOS: runtime.GOOS, GOARCH: runtime.GOARCH, GoVersion: runtime.Version(),
 				MacOSVersion: strings.TrimSpace(macOSVersion), LogicalCPUCount: runtime.NumCPU(),
 			},
-			Workload: "idle bsbctl daemon with native Mac resource sampling, one bounded synthetic Codex quota fetch, and a loopback fake BUSY Bar status/display endpoint",
+			Workload: "idle bsbctl daemon with native Mac resource sampling, one bounded synthetic Codex quota fetch, unconfigured GitHub Notifications and Slack process lifecycles, and a loopback fake BUSY Bar status/display endpoint",
 			SyntheticInputs: []string{
 				"temporary synthetic Codex auth.json and config.toml",
 				"loopback bounded Codex usage JSON",
+				"exact-empty GitHub Notifications configuration without credentials or provider requests",
+				"exact-empty Slack configuration without credentials or provider requests",
 				"loopback fake BUSY Bar version, protobuf status stream, and display success responses",
 			},
 			BuiltWithRace: false, BuildFlags: []string{"-trimpath"},

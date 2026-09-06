@@ -8,13 +8,16 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/lxdb/bsbctl/internal/appsetup"
 	"github.com/lxdb/bsbctl/internal/assets"
 	"github.com/lxdb/bsbctl/internal/config"
 	"github.com/lxdb/bsbctl/internal/presentation"
 	"github.com/lxdb/bsbctl/plugins/calendar"
 	"github.com/lxdb/bsbctl/plugins/codex"
 	"github.com/lxdb/bsbctl/plugins/codexquota"
+	"github.com/lxdb/bsbctl/plugins/githubnotifications"
 	"github.com/lxdb/bsbctl/plugins/macresources"
+	"github.com/lxdb/bsbctl/plugins/slack"
 	pluginsdk "github.com/lxdb/bsbctl/sdk/plugin"
 )
 
@@ -38,6 +41,7 @@ type Descriptor struct {
 	SoakProfile          string
 	SoakExclusion        string
 	DefaultApp           config.App
+	Setup                appsetup.Runner
 }
 
 var descriptors = []Descriptor{
@@ -96,6 +100,25 @@ var descriptors = []Descriptor{
 		},
 	},
 	{
+		ID: githubnotifications.PluginID, DevelopmentVersion: githubnotifications.PluginVersion, DisplayName: "GitHub Notifications", Binary: "bsbctl-plugin-github-notifications",
+		Description: "Show selected unread GitHub notification threads.", Requirement: "Classic GitHub token with notifications or repo scope",
+		CommandPackage: "./cmd/bsbctl-plugin-github-notifications", TagPrefix: "plugin/github-notifications/v", ReleaseTitle: "GitHub Notifications plugin",
+		DefinitionForVersion: githubnotifications.DefinitionForVersion, SchemaPath: "plugins/githubnotifications/config.schema.json",
+		AssetRoot: "plugins/githubnotifications", Assets: githubnotifications.AssetDeclarations(),
+		FixturePath: "docs/protocol/v1/fixtures/plugins/github-notifications.json", SoakProfile: "synthetic-resident-data-sources",
+		Setup: githubnotifications.RunSetup,
+		DefaultApp: config.App{
+			ID: githubnotifications.AppID, PluginID: githubnotifications.PluginID, Enabled: true, Config: []byte(`{}`), LaunchAction: "open",
+			Policies: map[string]presentation.PolicyConfig{
+				githubnotifications.ChannelAttention: {
+					Policy: presentation.PolicyAttention, ActivationAction: "open", ActivationInput: "start_or_encoder", RequiresAck: true,
+				},
+				githubnotifications.ChannelConnection: {Policy: presentation.PolicyWhenRelevant, ActivationAction: "open"},
+				githubnotifications.ChannelLive:       {Policy: presentation.PolicyInteractive},
+			},
+		},
+	},
+	{
 		ID: macresources.PluginID, DevelopmentVersion: macresources.PluginVersion, DisplayName: "Mac Resources", Binary: "bsbctl-plugin-mac-resources",
 		Description: "Show CPU, memory, and network pressure.", Requirement: "No external account",
 		CommandPackage: "./cmd/bsbctl-plugin-mac-resources", TagPrefix: "plugin/mac-resources/v", ReleaseTitle: "Mac Resources plugin",
@@ -107,6 +130,22 @@ var descriptors = []Descriptor{
 				macresources.ChannelSummary:  {Policy: presentation.PolicyRotation, RotationIntervalMS: 60_000, RotationJitterPercent: 10},
 				macresources.ChannelPressure: {Policy: presentation.PolicyWhenRelevant},
 				macresources.ChannelLive:     {Policy: presentation.PolicyInteractive},
+			},
+		},
+	},
+	{
+		ID: slack.PluginID, DevelopmentVersion: "0.1.0", DisplayName: "Slack", Binary: "bsbctl-plugin-slack",
+		Description: "Show pending Slack DMs, channel messages, mentions, and watched threads.", Requirement: "User-created internal Slack app",
+		CommandPackage: "./cmd/bsbctl-plugin-slack", TagPrefix: "plugin/slack/v", ReleaseTitle: "Slack plugin",
+		DefinitionForVersion: slack.DefinitionForVersion, SchemaPath: "plugins/slack/config.schema.json",
+		AssetRoot: "plugins/slack", Assets: slack.AssetDeclarations(),
+		FixturePath: "docs/protocol/v1/fixtures/plugins/slack.json", SoakProfile: "synthetic-resident-data-sources",
+		DefaultApp: config.App{
+			ID: "slack", PluginID: slack.PluginID, Enabled: true, Config: []byte(`{}`), LaunchAction: "open",
+			Policies: map[string]presentation.PolicyConfig{
+				slack.ChannelAttention:  {Policy: presentation.PolicyAttention, RequiresAck: true, ActivationAction: "open", ActivationInput: "start_or_encoder"},
+				slack.ChannelConnection: {Policy: presentation.PolicyWhenRelevant, ActivationAction: "open"},
+				slack.ChannelLive:       {Policy: presentation.PolicyInteractive},
 			},
 		},
 	},

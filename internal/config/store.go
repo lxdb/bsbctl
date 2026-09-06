@@ -337,6 +337,9 @@ func (d Document) Validate() error {
 			if policy.DevicePriority < 0 || policy.DevicePriority > 100 || policy.HoldMS < 0 || policy.CooldownMS < 0 {
 				errs = append(errs, fmt.Errorf("app %q channel %q has invalid policy bounds", key, channelID))
 			}
+			if policy.ActivationInput != "" && ((policy.ActivationInput != "start" && policy.ActivationInput != "start_or_encoder") || policy.ActivationAction == "") {
+				errs = append(errs, fmt.Errorf("app %q channel %q activation_input requires start or start_or_encoder and activation_action", key, channelID))
+			}
 			if policy.ActivationAction != "" {
 				if err := identifier.Validate("activation action", policy.ActivationAction); err != nil {
 					errs = append(errs, fmt.Errorf("app %q channel %q: %w", key, channelID, err))

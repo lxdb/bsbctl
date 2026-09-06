@@ -143,6 +143,7 @@ Apps and plugins:
   bsbctl app create <app-id> --plugin PLUGIN-ID --file PATH|- [--enabled true|false] [--socket PATH]
   bsbctl app delete <app-id> [--socket PATH]
   bsbctl app config <app-id> --file PATH|- [--socket PATH]
+  bsbctl app setup <app-id> --file CONFIG [--token-stdin]
   bsbctl app launch <app-id> [action] [--socket PATH]
   bsbctl app query <app-id> <operation> [--file PATH|-] [--socket PATH]
   bsbctl app command <app-id> <operation> [--file PATH|-] [--socket PATH]

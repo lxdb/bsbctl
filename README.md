@@ -1,6 +1,6 @@
 # bsbctl
 
-`bsbctl` connects BUSY Bar to local tools on macOS. It shows Calendar events, Codex activity and quota, and Mac resource usage.
+`bsbctl` connects BUSY Bar to local tools and services on macOS. It shows Calendar events, Codex activity and quota, GitHub notifications, Mac resource usage, and pending Slack activity.
 
 ## See it on the device
 
@@ -9,8 +9,8 @@ These previews use mock data. See [preview generation](docs/maintainers/developm
 | Local Mac Calendar | Codex | Codex quota |
 | :---: | :---: | :---: |
 | ![Calendar app showing bsbctl release review and preview capture events with countdowns and event options on a BUSY Bar](docs/previews/calendar-front.gif) | ![Codex app showing bsbctl activity, plans, approvals, questions, compaction, completion, interruption, and failure states on a BUSY Bar](docs/previews/codex-front.gif) | ![Codex Quota app showing normal weekly and critical five-hour mock allowances on a BUSY Bar](docs/previews/codex-quota-front.gif) |
-| **Mac Resources** |  |  |
-| ![Mac Resources app showing fixed mock CPU, memory, and network readings on a BUSY Bar](docs/previews/mac-resources-front.gif) |  |  |
+| **GitHub Notifications** | **Mac Resources** | **Slack** |
+| ![GitHub Notifications app showing mock review requests and mentions on a BUSY Bar](docs/previews/github-notifications-front.gif) | ![Mac Resources app showing fixed mock CPU, memory, and network readings on a BUSY Bar](docs/previews/mac-resources-front.gif) | ![Slack app showing mock setup, pending direct messages and mentions, local actions, stale coverage, and authentication states on a BUSY Bar](docs/previews/slack-front.gif) |
 
 ## Install
 

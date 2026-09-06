@@ -113,11 +113,13 @@ type AppMutationResult struct {
 }
 
 type ReplaceConfigRequest struct {
-	AppID        string                               `json:"app_id"`
-	Config       json.RawMessage                      `json:"config"`
-	Secrets      map[string]string                    `json:"secrets,omitempty"`
-	Policies     map[string]presentation.PolicyConfig `json:"policies"`
-	LaunchAction string                               `json:"launch_action,omitempty"`
+	AppID string `json:"app_id"`
+	// ExpectedGeneration is an optional precondition on the complete daemon document.
+	ExpectedGeneration uint64                               `json:"expected_generation,omitzero"`
+	Config             json.RawMessage                      `json:"config"`
+	Secrets            map[string]string                    `json:"secrets,omitempty"`
+	Policies           map[string]presentation.PolicyConfig `json:"policies"`
+	LaunchAction       string                               `json:"launch_action,omitempty"`
 }
 
 type AppConfigResult struct {

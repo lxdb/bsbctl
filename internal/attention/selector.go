@@ -135,7 +135,8 @@ func Select(records []observation.Record, resolve Resolver, history presentation
 		lastShown := history.LastShown[candidate.ID()]
 		if rule.Policy == presentation.PolicyRotation {
 			evaluation.NextDue = rotationNextDue(candidate.ID(), lastShown, rule.RotationIntervalMS, rule.RotationJitterPercent)
-			if candidate.ID() != history.CurrentID && !evaluation.NextDue.IsZero() && now.Before(evaluation.NextDue) {
+			withinCurrentHold := candidate.ID() == history.CurrentID && now.Before(history.CurrentSince.Add(candidate.Hold()))
+			if !withinCurrentHold && !evaluation.NextDue.IsZero() && now.Before(evaluation.NextDue) {
 				evaluation.Reason = ReasonNotDue
 				evaluations[index] = evaluation
 				continue

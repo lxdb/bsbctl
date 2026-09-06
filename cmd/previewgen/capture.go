@@ -20,7 +20,6 @@ import (
 	"github.com/lxdb/bsbctl/internal/config"
 	"github.com/lxdb/bsbctl/internal/deviceownership"
 	"github.com/lxdb/bsbctl/internal/secrets"
-	"github.com/lxdb/bsbctl/plugins/codex"
 	"github.com/lxdb/bsbctl/sdk/protocol"
 	busylib "github.com/lxdb/busylib-go"
 	framepkg "github.com/lxdb/busylib-go/frame"
@@ -41,6 +40,18 @@ type previewCaptureDisplay interface {
 type captureTiming struct {
 	now  func() time.Time
 	wait func(context.Context, time.Duration) error
+}
+
+type previewCaptureAsset struct {
+	label      string
+	devicePath string
+	sourcePath string
+}
+
+var previewCaptureAssets = []previewCaptureAsset{
+	{label: "Codex mark", devicePath: previewAssetPath, sourcePath: filepath.Join("plugins", "codex", previewAssetSource)},
+	{label: "GitHub mark", devicePath: githubPreviewAssetPath, sourcePath: filepath.Join("plugins", "githubnotifications", githubPreviewAssetSource)},
+	{label: "Slack mark", devicePath: slackPreviewAssetPath, sourcePath: filepath.Join("plugins", "slack", slackPreviewAssetSource)},
 }
 
 func captureDeviceFixtures(ctx context.Context, options options) (result []mockFixture, resultErr error) {
@@ -94,10 +105,10 @@ func captureDeviceFixtures(ctx context.Context, options options) (result []mockF
 	if err := client.Assets().DeleteApplicationAssets(ctx, previewApplication); err != nil {
 		return nil, fmt.Errorf("clear prior preview assets: %w", err)
 	}
-	declaration := codex.AssetDeclarations()[0]
-	assetPath := filepath.Join("plugins", "codex", declaration.Source)
-	if err := client.Assets().UploadFile(ctx, previewApplication, previewAssetPath, assetPath); err != nil {
-		return nil, fmt.Errorf("upload preview Codex mark: %w", err)
+	for _, asset := range previewCaptureAssets {
+		if err := client.Assets().UploadFile(ctx, previewApplication, asset.devicePath, asset.sourcePath); err != nil {
+			return nil, fmt.Errorf("upload preview %s: %w", asset.label, err)
+		}
 	}
 	deviceNow, err := client.Time().Now(ctx)
 	if err != nil {
@@ -279,9 +290,9 @@ func captureFixtureSet(ctx context.Context, display previewCaptureDisplay, scena
 		selected[scenario.File] = scenario
 	}
 	if len(selected) != len(capturedPreviewArtifactNames) {
-		return nil, errors.New("preview capture requires Calendar, Codex, and Codex quota animation scenarios")
+		return nil, errors.New("preview capture requires every device-rendered animation scenario")
 	}
-	result := make([]mockFixture, 0, 3)
+	result := make([]mockFixture, 0, len(capturedPreviewArtifactNames))
 	for _, name := range capturedPreviewArtifactNames {
 		scenario := selected[name]
 		frames, err := captureScenario(ctx, display, scenario, timing)

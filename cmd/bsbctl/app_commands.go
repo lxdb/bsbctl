@@ -41,12 +41,24 @@ func callStatus(ctx context.Context, args []string, stdout, stderr io.Writer) er
 }
 
 func runApp(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer) error {
+	return runAppWithSetup(ctx, args, stdin, stdout, stderr, runAppSetup)
+}
+
+func runAppWithSetup(
+	ctx context.Context,
+	args []string,
+	stdin io.Reader,
+	stdout, stderr io.Writer,
+	setup func(context.Context, []string, io.Reader, io.Writer, io.Writer) error,
+) error {
 	if len(args) == 0 {
-		return commandFailure(exitUsage, "app command requires list, enable, disable, create, delete, or launch")
+		return commandFailure(exitUsage, "app command requires list, enable, disable, create, delete, setup, or launch")
 	}
 	switch args[0] {
 	case "list", "status", "enable", "disable", "config", "query", "command":
 		return runAppInstance(ctx, args, stdin, stdout, stderr)
+	case "setup":
+		return setup(ctx, args[1:], stdin, stdout, stderr)
 	case "launch":
 		options, positionals, err := parseOptions(args[1:], "socket")
 		if err != nil || len(positionals) < 1 || len(positionals) > 2 {
@@ -338,10 +350,11 @@ func publicAppStatuses(status control.Status) []appInstanceStatus {
 }
 
 type appConfigurationInput struct {
-	Config       json.RawMessage                      `json:"config"`
-	Secrets      map[string]string                    `json:"secrets,omitempty"`
-	Policies     map[string]presentation.PolicyConfig `json:"policies,omitempty"`
-	LaunchAction string                               `json:"launch_action,omitempty"`
+	Config               json.RawMessage                      `json:"config"`
+	Secrets              map[string]string                    `json:"secrets,omitempty"`
+	Policies             map[string]presentation.PolicyConfig `json:"policies,omitempty"`
+	LaunchAction         string                               `json:"launch_action,omitempty"`
+	launchActionProvided bool
 }
 
 func readAppConfiguration(path string, stdin io.Reader) (appConfigurationInput, error) {
@@ -366,6 +379,11 @@ func readAppConfiguration(path string, stdin io.Reader) (appConfigurationInput, 
 	if err := protocol.DecodeStrict(data, &input); err != nil {
 		return appConfigurationInput{}, &inputFailure{}
 	}
+	var fields map[string]json.RawMessage
+	if err := protocol.DecodeStrict(data, &fields); err != nil {
+		return appConfigurationInput{}, &inputFailure{}
+	}
+	_, input.launchActionProvided = fields["launch_action"]
 	if err := protocol.ValidateJSONObject("config", input.Config, false); err != nil {
 		return appConfigurationInput{}, &inputFailure{}
 	}
