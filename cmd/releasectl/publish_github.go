@@ -45,13 +45,40 @@ func (remote *githubReleaseRemote) Get(ctx context.Context, tag string) (remoteR
 		return remoteRelease{}, false, err
 	}
 	if status == http.StatusNotFound {
-		return remoteRelease{}, false, nil
+		// GitHub's by-tag endpoint only returns published releases.
+		return remote.findReleaseInList(ctx, tag)
 	}
 	if status != http.StatusOK {
 		return remoteRelease{}, false, errors.New("GitHub release lookup failed")
 	}
 	release, err := decodeRemoteRelease(data)
 	return release, err == nil, err
+}
+
+func (remote *githubReleaseRemote) findReleaseInList(ctx context.Context, tag string) (remoteRelease, bool, error) {
+	const pageSize = 30
+	for page := 1; ; page++ {
+		endpoint := remote.repositoryEndpoint(fmt.Sprintf("/releases?per_page=%d&page=%d", pageSize, page))
+		data, status, err := remote.request(ctx, http.MethodGet, endpoint, nil, "")
+		if err != nil {
+			return remoteRelease{}, false, err
+		}
+		if status != http.StatusOK {
+			return remoteRelease{}, false, errors.New("GitHub release lookup failed")
+		}
+		var releases []remoteRelease
+		if err := json.Unmarshal(data, &releases); err != nil {
+			return remoteRelease{}, false, errors.New("GitHub release response is invalid")
+		}
+		for _, release := range releases {
+			if release.Tag == tag {
+				return release, true, nil
+			}
+		}
+		if len(releases) < pageSize {
+			return remoteRelease{}, false, nil
+		}
+	}
 }
 
 func (remote *githubReleaseRemote) DownloadAsset(ctx context.Context, tag, name string) ([]byte, error) {
