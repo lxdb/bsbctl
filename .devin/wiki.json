@@ -1,0 +1,255 @@
+{
+  "repo_notes": [
+    {
+      "content": "Write for three audiences in order: people using bsbctl on macOS, developers building executable plugins, and contributors maintaining the daemon. Overview routes readers; Apps owns provider setup; Operations owns commands and recovery; Plugin Development owns public extension contracts; Architecture owns implementation behavior; Maintenance owns builds, tests, and releases. Each parent should answer a useful overview question and link its children without repeating them."
+    },
+    {
+      "content": "Use the indexed revision's source, executable examples, configuration schemas, and contract tests as evidence. docs/README.md maps current reader tasks; docs/reference/architecture.md maps current owners. Verify prose against those owners. Previous wikis and docs/research/ are not current contracts. Read protocol, configuration, dependency, and release versions from their defining files. Do not carry forward historical protocol versions or assert compatibility beyond the current exact contract."
+    },
+    {
+      "content": "Explain app versus plugin versus package early: an app is a configured instance, one supervised plugin process can serve multiple instances, and a package supplies an executable and authenticated resources. Derive built-in IDs, supported modes, operations, and defaults from internal/firstpartyplugins/registry.go and plugin schemas. Separate installing a package, creating an app, enabling an app, and starting a foreground session."
+    },
+    {
+      "content": "Keep instructions task-oriented: prerequisites, the shortest supported command sequence, expected JSON or device outcome, failure interpretation, and the next relevant link. Use actual CLI help, command tests, docs/examples/, and examples/ for commands and examples. Full app configuration is replacement, not a patch. Use secret references and safe placeholders; never include real Calendar content, Codex session data, access tokens, private paths, or credentials."
+    },
+    {
+      "content": "Preserve ownership boundaries: the daemon owns configuration, attention, plugin lifecycle, and device writes; plugins report observations and declared operations through the inherited private RPC socket. CLI control RPC and plugin RPC are different connections. A direct screenshot command reads the device without the daemon. Do not imply plugins are sandboxed, can write directly to BUSY Bar, or can be installed in production from arbitrary executable paths."
+    },
+    {
+      "content": "Separate durable desired state, accepted live state, observation generation, foreground session identity, and persisted recovery data. Describe partial results and uncertain durability explicitly: a failed command can follow a committed change. Input and external effects must remain bound to the exact admitted session and generation. Do not invent atomic cross-system updates, exactly-once provider effects, automatic rollback, or automatic provider recovery."
+    },
+    {
+      "content": "Give each topic one primary home, cross-link details, and define specialized terms at first use. Prefer concise prose, shallow headings, exact comparison tables, and source-linked diagrams for runtime boundaries, reconciliation, observation selection, and execution admission. Avoid repeated entity inventories, one page per private package, decorative diagrams, and a separate glossary. Distinguish public SDK contracts from private implementation details."
+    },
+    {
+      "content": "Describe what repository checks verify and what remains external. Mock previews do not prove device output; loopback soak tests do not prove long-duration or physical-device behavior; artifact verification does not prove Gatekeeper acceptance or GitHub protection settings. Read current release inputs, trust keys, licenses, and notices before discussing publication. Do not claim a release exists, a check passed, or a provider feature works merely because a workflow or README describes it."
+    }
+  ],
+  "pages": [
+    {
+      "title": "Overview",
+      "purpose": "Introduce bsbctl as a macOS application that connects local providers to BUSY Bar. Use README.md, docs/README.md, internal/firstpartyplugins/registry.go, and docs/reference/architecture.md. Explain CLI, daemon, built-in apps, and supervised plugin packages; provide a task navigation table for users, plugin authors, and maintainers. State supported runtime scope and route installation, app selection, troubleshooting, and extension development.",
+      "parent": null
+    },
+    {
+      "title": "Install and Connect BUSY Bar",
+      "purpose": "Guide release installation, app selection, device addressing, Keychain-backed authentication, version/status checks, and updates using docs/getting-started.md, install.sh, cmd/bsbctl/setup.go, cmd/bsbctl/init_command.go, and internal/launchagent/. Explain no default app selection, existing-setting preservation, setup restart behavior, and the difference between daemon response and device readiness. Link source installation and recovery rather than duplicating them.",
+      "parent": "Overview",
+      "page_notes": [
+        {
+          "content": "Keep release setup, source init, and local reinstall as distinct workflows. Read supported flags from command source. Never suggest saving raw device credentials in configuration or imply ad-hoc signing means notarization."
+        }
+      ]
+    },
+    {
+      "title": "Compatibility and Limits",
+      "purpose": "Consolidate supported macOS and architecture requirements, Go/build dependencies, exact plugin protocol and durable schema versions, optional provider prerequisites, and resource limits. Use docs/reference/compatibility.md, go.mod, sdk/protocol/, sdk/rpc/, internal/config/, plugin schemas, scripts/verify-tools.env, and release/versions.json. Give source-linked tables with units, defaults, and failure behavior; explain structural JSON Schema versus behavioral Go validation.",
+      "parent": "Overview"
+    },
+    {
+      "title": "Apps",
+      "purpose": "Help users select and manage apps using docs/apps.md, internal/firstpartyplugins/registry.go, cmd/bsbctl/app_commands.go, examples/, and plugin configuration schemas. Provide the exact app-ID/plugin-ID/requirement/operation map, then show list, create, configure, enable, disable, and delete. Explain full configuration replacement, policies, launch actions, secrets, multiple instances, and package retention after app deletion. Link the four provider guides.",
+      "parent": null
+    },
+    {
+      "title": "Calendar",
+      "purpose": "Document the local Apple Calendar integration from docs/calendar.md, examples/calendar.json, plugins/calendar/, and cmd/bsbctl-plugin-calendar/. Cover macOS/EventKit and permission prerequisites, calendar selection, upcoming/active events, attendance and event options, URL actions, checkpoint behavior, schema settings, and privacy. Show how to configure and diagnose the app before explaining provider-to-observation flow.",
+      "parent": "Apps",
+      "page_notes": [
+        {
+          "content": "Use source to distinguish app-local attendance state, provider reads, and external effects. Explain what the read-only launcher permits versus an exact event action. Keep any event examples synthetic."
+        }
+      ]
+    },
+    {
+      "title": "Codex Activity and Device Responses",
+      "purpose": "Explain plugins/codex/ and its app-server connection using docs/codex-app-server.md, examples/codex-personal.json, examples/codex-private.json, and plugins/codex/internal/appserver/. Cover connection prerequisites, supported instance count, activity and progress cards, session listing/pinning, sensitive-detail settings, supported approval/question input, confirmation, stale-request invalidation, reconnect behavior, and optional connection-provided quota.",
+      "parent": "Apps",
+      "page_notes": [
+        {
+          "content": "Describe only provider methods and events implemented in this repository. The plugin uses the Codex app-server proxy; do not invent hooks or daemon installation. Unsupported, secret, free-text-only, or ambiguous requests must not become actionable in examples. Distinguish this app from the standalone quota plugin."
+        }
+      ]
+    },
+    {
+      "title": "Codex Quota",
+      "purpose": "Explain the independent quota integration using docs/codex-quota.md, examples/codex-quota.json, plugins/codexquota/, and internal/codexusage/. Cover profile/account identity, configuration versus credential homes, polling and thresholds, badges, reset displays, expired or missing credentials, request bounds, and redaction. Explain credential destination and custom endpoint implications from source.",
+      "parent": "Apps",
+      "page_notes": [
+        {
+          "content": "Do not generalize configured thresholds or observed response shapes into OpenAI subscription guarantees. Explain the difference between this plugin and optional quota data received by the Codex app-server integration."
+        }
+      ]
+    },
+    {
+      "title": "Mac Resources",
+      "purpose": "Explain CPU, memory, and network observations using docs/mac-resources.md, examples/mac-resources.json, plugins/macresources/config.schema.json, collector_darwin.go, pressure.go, and view.go in plugins/macresources/. Cover sampling, threshold and recovery behavior, units, initial/unavailable telemetry, interactive versus ambient display, and supported platform behavior. Distinguish live measurements from deterministic preview data.",
+      "parent": "Apps"
+    },
+    {
+      "title": "Operations",
+      "purpose": "Orient operators around daemon, app, plugin, and device readiness using docs/operations.md and docs/reference/errors.md. Give a short diagnosis flow that selects the relevant status command and routes to service recovery, display/attention diagnosis, or CLI reference. Explain single device-writer ownership, configuration/socket/service paths, redacted diagnostics, and when a partial result requires inspecting saved state before another mutation.",
+      "parent": null
+    },
+    {
+      "title": "Service Lifecycle and Troubleshooting",
+      "purpose": "Document per-user LaunchAgent install/status/restart/uninstall, foreground daemon use, matching custom paths, logging and rotation, and recovery using docs/operations.md, cmd/bsbctl/service_command.go, internal/launchagent/, internal/logfile/, internal/daemonrun/errors.go, and status code definitions. Cover socket unavailable, unhealthy plugin, device not ready, degraded persistence, and partial or uncertain mutations with observable recovery checks.",
+      "parent": "Operations",
+      "page_notes": [
+        {
+          "content": "A new PID or responding socket does not establish device or app readiness. Keep diagnosis ahead of restart or mutation, and distinguish service uninstall from removing configuration, packages, or credentials."
+        }
+      ]
+    },
+    {
+      "title": "Device Controls and Attention Decisions",
+      "purpose": "Explain encoder, OK, START/PAUSE, BACK, the APPS selector, read-only launcher views, foreground actions, cooldown, acknowledgement, and attention status/explain/history using docs/device-and-attention.md, cmd/bsbctl/attention_command.go, internal/attention/, internal/input/, and session source. Include screenshot and sequence capture from docs/operations.md and cmd/bsbctl/device_screenshot.go, including partial manifests.",
+      "parent": "Operations",
+      "page_notes": [
+        {
+          "content": "This page owns operator-visible behavior; link ranking, arbitration, and generation-bound execution details to Architecture. Distinguish acknowledgement, app disablement, provider completion, and display suppression."
+        }
+      ]
+    },
+    {
+      "title": "CLI and Exit Code Reference",
+      "purpose": "Create the complete command discovery reference from docs/reference/cli.md, docs/reference/errors.md, cmd/bsbctl/, help output definitions, and CLI contract tests. Map command families to prerequisites, inputs, JSON outputs, flags, state effects, and exit codes. Explain stdin JSON, app configuration replacement, package commands, and partial-result recovery. Link task guides for full walkthroughs.",
+      "parent": "Operations",
+      "page_notes": [
+        {
+          "content": "Document every current public command, including setup/init, service, daemon, app, plugin, attention, version/status, and device screenshot. Keep internal localinstall, previewgen, and releasectl tools in Maintenance."
+        }
+      ]
+    },
+    {
+      "title": "Plugin Development",
+      "purpose": "Introduce the supported plugin extension path using docs/plugin-authoring.md, docs/reference/plugin-sdk.md, docs/examples/external-plugin/, and docs/examples/raw-json-plugin/. Explain public SDK package responsibilities, supervised execution, immutable definitions, declared capabilities, and the simplest complete example. Separate compiling an external-module example, verifying a plugin contract, and production admission through a signed catalog.",
+      "parent": null
+    },
+    {
+      "title": "Go SDK and Plugin Lifecycle",
+      "purpose": "Explain sdk/plugin, sdk/protocol, and sdk/rpc public roles using docs/reference/plugin-sdk.md, sdk/plugin/plugin.go, and external examples. Cover Definition and Run, initialization, atomic ReplaceInstances, optional session/operation/health/shutdown interfaces, callback serialization, background worker ownership, contexts, host calls, checkpoints, and permanent configuration failures. Show shutdown and replacement failure handling.",
+      "parent": "Plugin Development",
+      "page_notes": [
+        {
+          "content": "One process serves the complete enabled instance set for its package. Distinguish serialized callbacks from concurrent plugin-owned work. Do not run the example directly without the inherited private socket or register it by editing live configuration."
+        }
+      ]
+    },
+    {
+      "title": "Observations, Interactive Sessions, and Effects",
+      "purpose": "Guide plugin authors through generation-bound observations, declared channels, keys/revisions/expiry, scene versus native timer presentations, asset references, foreground input, and external effects. Use docs/plugin-authoring.md, sdk/protocol/observations.go, sdk/protocol/presentation.go, sdk/protocol/sessions.go, sdk/protocol/host.go, and executable examples. Explain execution admission immediately before an effect, completion, invalidation, checkpoint persistence, and safe failure handling.",
+      "parent": "Plugin Development",
+      "page_notes": [
+        {
+          "content": "Separate observation resolution, session completion, and provider side effects. Preserve the exact instance and session identity; do not retry ambiguous input or repeat an external effect merely because persistence failed. Read deadline and payload constraints from the current protocol and validators."
+        }
+      ]
+    },
+    {
+      "title": "Plugin Wire Protocol",
+      "purpose": "Explain the independent implementation contract in docs/protocol/v1/spec.md, docs/protocol/v1/schema.json, sdk/rpc/, sdk/protocol/, raw-JSON examples, and protocol fixtures. Cover the inherited FD 3 socket, newline-delimited JSON-RPC 2.0, exact version agreement, method directions, IDs, deadlines, cancellation and late responses, strict JSON validation, lifecycle admission, errors, byte ownership, and limits. Link the normative specification for exact method payloads.",
+      "parent": "Plugin Development",
+      "page_notes": [
+        {
+          "content": "Keep the plugin wire protocol distinct from the Unix control socket used by CLI clients. The schema is not the complete semantic contract. Avoid historical ID-history rules or protocol negotiation claims; check the indexed implementation and conformance tests."
+        }
+      ]
+    },
+    {
+      "title": "Package, Verify, and Install Plugins",
+      "purpose": "Explain package contents, executable/manifest identity, authenticated schemas/assets, conformance fixtures, signed catalogs, sequence validation, install/update/rollback, and retained versions using docs/plugin-packaging.md, internal/catalog/, internal/pluginverify/, internal/installer/, internal/releasekeys/, and cmd/bsbctl/catalog_commands.go. Describe verification coverage and pre-commit versus post-commit failure behavior. Link maintainer release publication and runtime installation recovery.",
+      "parent": "Plugin Development",
+      "page_notes": [
+        {
+          "content": "A conforming external plugin is not automatically authorized for production installation. Supervision is not a sandbox. Keep catalog trust, package verification, live handshake, activation, and physical-device evidence distinct."
+        }
+      ]
+    },
+    {
+      "title": "Architecture",
+      "purpose": "Explain the runtime component and ownership map using docs/reference/architecture.md, internal/daemonrun/run.go, internal/daemon/, internal/control/, sdk/, and internal/device/. Trace CLI requests and plugin observations to the daemon and BUSY Bar, with public versus private boundaries clearly marked. Route contributors to the owner of a change and the focused runtime pages below. Mention the direct read-only screenshot path as an explicit exception to daemon-mediated commands.",
+      "parent": null
+    },
+    {
+      "title": "Daemon Startup and Desired-State Reconciliation",
+      "purpose": "Trace startup recovery, construction, device ownership, initial reconciliation, control-socket admission, workers, and bounded shutdown using internal/daemonrun/, internal/daemon/desired_state.go, live_state.go, reconciler files, activator.go, and internal/control/. Explain configuration transactions versus accepted live state, generations, secrets/assets/checkpoints, retries, partial results, and cancellation ownership with a concrete app-change sequence.",
+      "parent": "Architecture",
+      "page_notes": [
+        {
+          "content": "Use current narrow owners such as DesiredState, LiveState, Reconciler, SessionCoordinator, PackageOps, and RuntimeStatus. Do not describe an obsolete broad service facade or imply durable commit and runtime convergence happen atomically."
+        }
+      ]
+    },
+    {
+      "title": "Plugin Supervision and Package Activation",
+      "purpose": "Explain internal/pluginhost/ process and supervisor lifecycles, internal/daemon/package_ops.go, internal/installer/, and internal/daemonrun/installer_test.go. Cover authenticated executable launch, handshake, complete instance replacement, transient/permanent failures, retry, process retirement, session cleanup, package activation, retained rollback, and interrupted-install recovery. Use lifecycle tests to identify who cancels, joins, and owns failures.",
+      "parent": "Architecture"
+    },
+    {
+      "title": "Attention Selection and Input Routing",
+      "purpose": "Trace provider observation to retained record, eligibility, ranking/rotation, foreground presentation, physical input, execution admission, and completion using internal/observation/, internal/attention/, internal/presentation/, internal/input/, internal/eventbus/, internal/livesession/, and internal/daemon/session files. Explain policy resolution, expiry/revisions, acknowledgement, cooldown, and rejection of stale generations or sessions.",
+      "parent": "Architecture",
+      "page_notes": [
+        {
+          "content": "Use source-linked state or sequence diagrams for selection and exact-session execution. Link user controls and plugin-author requirements instead of repeating them. Distinguish selection, attempted delivery, confirmed delivery, and persistence of attention history."
+        }
+      ]
+    },
+    {
+      "title": "Device Runtime, Rendering, and Assets",
+      "purpose": "Explain internal/device/, internal/assets/, internal/deviceownership/, and internal/presentation/compiler.go. Trace busylib-go status and input into the runtime, scene compilation and output, native BUSY timers, audio cues, package asset reconciliation, readiness, retries, and shutdown cleanup. Clarify single-writer ownership and render/delivery outcomes. Link library documentation for busylib-go internals.",
+      "parent": "Architecture",
+      "page_notes": [
+        {
+          "content": "Explain scene rendering versus firmware-native timers and how ownership constrains stopping or clearing output. Do not imply bsbctl implements MQTT remote access merely because its busylib-go dependency supports it."
+        }
+      ]
+    },
+    {
+      "title": "Persistence, Secrets, and Diagnostics",
+      "purpose": "Explain durable configuration generations, atomic file replacement and uncertain durability, plugin-owned checkpoints, attention history, catalog/install state, Keychain references, and bounded/redacted logs using internal/config/, internal/localstate/, internal/checkpoint/, internal/attention/state.go, internal/installer/state.go, internal/secrets/, internal/pluginlog/, and internal/logfile/. Map each record to its owner, lifetime, restoration behavior, and failure semantics.",
+      "parent": "Architecture",
+      "page_notes": [
+        {
+          "content": "Keep raw credentials out of configuration, checkpoint, observation, and diagnostic examples. Describe what survives restart and what does not. Read-only status must not be described as driving reconciliation, and missing telemetry must not be labeled healthy."
+        }
+      ]
+    },
+    {
+      "title": "Maintenance",
+      "purpose": "Orient contributors using CONTRIBUTING.md, docs/maintainers/development.md, docs/maintainers/testing.md, docs/release.md, SECURITY.md, SUPPORT.md, and the repository tooling. Explain where to change commands, providers, SDK/protocol, daemon behavior, docs, and release metadata. Route local development, validation/preview work, and publication to dedicated children.",
+      "parent": null
+    },
+    {
+      "title": "Build and Reinstall from Source",
+      "purpose": "Document pinned toolchain and platform prerequisites, the root module and optional local workspace, minimal source initialization, optional plugin builds, and local reinstall using docs/maintainers/development.md, scripts/go.sh, install.sh, and cmd/localinstall/. Explain preserved settings, catalog-managed versus local packages, build-before-stop ordering, readiness checks, recovery files, and failures before or after commit.",
+      "parent": "Maintenance",
+      "page_notes": [
+        {
+          "content": "Local reinstall is a real mutation of the installed service, not a verification command. A stopped service stays stopped; source compilation and local installation do not run the test suite or prove release readiness."
+        }
+      ]
+    },
+    {
+      "title": "Testing, CI, and Device Previews",
+      "purpose": "Map change types to verification and evidence using scripts/verify.sh, scripts/verify-tools.env, docs/maintainers/testing.md, docs/documentation_test.go, cmd/bsbctl/documentation_contract_test.go, SDK/protocol fixtures, and .github/workflows/. Cover formatting/tests/vet/race/coverage/security/fuzz/depth/dead-code, external examples, release checks, and platform limits. Explain cmd/previewgen/ mock fixtures, production scene paths, regeneration, and explicit physical-device capture.",
+      "parent": "Maintenance",
+      "page_notes": [
+        {
+          "content": "Distinguish mock-only preview generation from capture mode, provider behavior from fixture inputs, and deterministic/loopback tests from physical-device evidence. Do not report workflows as passing unless execution evidence is available."
+        }
+      ]
+    },
+    {
+      "title": "Release Artifacts and Signed Catalogs",
+      "purpose": "Document the complete first-party release workflow from docs/release.md, cmd/releasectl/, internal/releaseartifact/, internal/releasecheck/, release/, internal/releasekeys/, and .github/workflows/release.yml. Cover component versions and tags, both Darwin architectures, reproducibility, ad-hoc signing, archive contents/SBOM/licenses, catalog signatures and predecessor sequence, approvals, publish order, recovery after partial publication, and bounded soak evidence.",
+      "parent": "Maintenance",
+      "page_notes": [
+        {
+          "content": "Read current blockers and trust inputs without assuming historical blockers remain active or have been cleared. Explain why plugin releases publish before core and why immutable tags/assets and authenticated artifact reuse matter. Artifact validation does not establish notarization, device behavior, or live GitHub settings."
+        }
+      ]
+    }
+  ]
+}
