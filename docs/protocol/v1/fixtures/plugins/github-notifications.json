@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "instances": [{"id": "github-notifications", "generation": 1, "config": {}}],
+  "sessions": [{
+    "start": {
+      "instance": {"id": "github-notifications", "generation": 1},
+      "action": "open",
+      "session_token": "github-notifications-session",
+      "trigger": {"kind": "launcher"}
+    },
+    "inputs": [{
+      "sequence": 1,
+      "occurred_at": "2026-09-05T12:00:00Z",
+      "instance": {"id": "github-notifications", "generation": 1},
+      "session_token": "github-notifications-session",
+      "input": {"button": {"button": "back", "action": "press"}}
+    }],
+    "end": {"instance": {"id": "github-notifications", "generation": 1}, "session_token": "github-notifications-session"}
+  }],
+  "operations": [
+    {"instance": {"id": "github-notifications", "generation": 1}, "operation": "status", "payload": {}},
+    {"instance": {"id": "github-notifications", "generation": 1}, "operation": "items", "payload": {"limit": 20}}
+  ]
+}

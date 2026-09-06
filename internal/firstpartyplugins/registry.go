@@ -15,6 +15,7 @@ import (
 	"github.com/lxdb/bsbctl/plugins/calendar"
 	"github.com/lxdb/bsbctl/plugins/codex"
 	"github.com/lxdb/bsbctl/plugins/codexquota"
+	"github.com/lxdb/bsbctl/plugins/githubnotifications"
 	"github.com/lxdb/bsbctl/plugins/macresources"
 	pluginsdk "github.com/lxdb/bsbctl/sdk/plugin"
 )
@@ -94,6 +95,25 @@ var descriptors = []Descriptor{
 				codexquota.ChannelSummary:  {Policy: presentation.PolicyRotation, RotationIntervalMS: 300_000, RotationJitterPercent: 10},
 				codexquota.ChannelPressure: {Policy: presentation.PolicyWhenRelevant},
 				codexquota.ChannelLive:     {Policy: presentation.PolicyInteractive},
+			},
+		},
+	},
+	{
+		ID: githubnotifications.PluginID, DevelopmentVersion: githubnotifications.PluginVersion, DisplayName: "GitHub Notifications", Binary: "bsbctl-plugin-github-notifications",
+		Description: "Show selected unread GitHub notification threads.", Requirement: "Classic GitHub token with notifications or repo scope",
+		CommandPackage: "./cmd/bsbctl-plugin-github-notifications", TagPrefix: "plugin/github-notifications/v", ReleaseTitle: "GitHub Notifications plugin",
+		DefinitionForVersion: githubnotifications.DefinitionForVersion, SchemaPath: "plugins/githubnotifications/config.schema.json",
+		AssetRoot: "plugins/githubnotifications", Assets: githubnotifications.AssetDeclarations(),
+		FixturePath: "docs/protocol/v1/fixtures/plugins/github-notifications.json", SoakProfile: "synthetic-resident-data-sources",
+		Setup: githubnotifications.RunSetup,
+		DefaultApp: config.App{
+			ID: githubnotifications.AppID, PluginID: githubnotifications.PluginID, Enabled: true, Config: []byte(`{}`), LaunchAction: "open",
+			Policies: map[string]presentation.PolicyConfig{
+				githubnotifications.ChannelAttention: {
+					Policy: presentation.PolicyAttention, ActivationAction: "open", ActivationInput: "start_or_encoder", RequiresAck: true,
+				},
+				githubnotifications.ChannelConnection: {Policy: presentation.PolicyWhenRelevant, ActivationAction: "open"},
+				githubnotifications.ChannelLive:       {Policy: presentation.PolicyInteractive},
 			},
 		},
 	},

@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "repositories": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "alias"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9_.-]{1,100}$",
+            "not": {
+              "pattern": "/\\.{1,2}$"
+            }
+          },
+          "alias": {
+            "type": "string",
+            "pattern": "^[ -~]{1,8}$"
+          }
+        }
+      }
+    },
+    "label": {
+      "type": "string",
+      "pattern": "^[ -~]{1,8}$"
+    },
+    "rear_details": {
+      "type": "boolean"
+    },
+    "poll_interval_seconds": {
+      "type": "integer",
+      "minimum": 60,
+      "maximum": 900
+    },
+    "notification_reasons": {
+      "oneOf": [
+        {
+          "enum": [
+            "actionable",
+            "all"
+          ]
+        },
+        {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "approval_requested",
+              "assign",
+              "invitation",
+              "mention",
+              "review_requested",
+              "security_alert",
+              "team_mention",
+              "author",
+              "ci_activity",
+              "comment",
+              "manual",
+              "member_feature_requested",
+              "security_advisory_credit",
+              "state_change",
+              "subscribed"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "oneOf": [
+    {
+      "maxProperties": 0
+    },
+    {
+      "required": [
+        "repositories"
+      ]
+    }
+  ]
+}
