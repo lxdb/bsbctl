@@ -248,9 +248,14 @@ func statusReady(status control.Status) bool {
 			return false
 		}
 	}
-	apps := make(map[string]daemon.AppReadinessPhase, 2)
+	apps := make(map[string]daemon.AppReadinessPhase, len(descriptors))
 	for _, app := range status.Readiness {
 		apps[app.AppID] = app.Phase
 	}
-	return apps["codex-quota"] == daemon.AppReady && apps["mac-resources"] == daemon.AppReady
+	for _, descriptor := range descriptors {
+		if apps[descriptor.DefaultApp.ID] != daemon.AppReady {
+			return false
+		}
+	}
+	return true
 }

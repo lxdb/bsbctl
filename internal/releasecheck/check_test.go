@@ -128,8 +128,8 @@ func TestCheckRequiresExactDualDarwinComponentDependencyUnion(t *testing.T) {
 	if report, err := check(root, lister); err != nil || len(report.Findings) != 0 {
 		t.Fatalf("exact inventory check = %#v, %v", report, err)
 	}
-	if len(calls) != 10 {
-		t.Fatalf("component/architecture closure calls = %v, want all ten", calls)
+	if len(calls) != 12 {
+		t.Fatalf("component/architecture closure calls = %v, want all twelve", calls)
 	}
 	for call, count := range calls {
 		if count != 1 {
@@ -202,8 +202,8 @@ fi
 		t.Fatal(err)
 	}
 	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
-	if len(lines) != 10 {
-		t.Fatalf("closure captures = %q, want ten", data)
+	if len(lines) != 12 {
+		t.Fatalf("closure captures = %q, want twelve", data)
 	}
 	seenCaches := make(map[string]struct{}, len(lines))
 	seenTargets := make(map[string]int)
@@ -225,7 +225,7 @@ fi
 			t.Fatalf("closure cache %q was not cleaned: %v", cache, err)
 		}
 	}
-	if len(seenTargets) != 10 {
+	if len(seenTargets) != 12 {
 		t.Fatalf("closure targets = %v, want both arches for every component", seenTargets)
 	}
 }
@@ -249,7 +249,7 @@ func checkWithReachable(root string, reachable []releaseartifact.ModuleVersion) 
 	})
 }
 
-const validReleasePlan = `{"schema_version":1,"components":[{"id":"bsbctl","kind":"core","version":"0.1.0","tag":"v0.1.0","package":"./cmd/bsbctl","binary":"bsbctl"},{"id":"dev.bsbctl.calendar","kind":"plugin","version":"0.1.0","tag":"plugin/calendar/v0.1.0","package":"./cmd/bsbctl-plugin-calendar","binary":"bsbctl-plugin-calendar"},{"id":"dev.bsbctl.codex","kind":"plugin","version":"0.1.0","tag":"plugin/codex/v0.1.0","package":"./cmd/bsbctl-plugin-codex","binary":"bsbctl-plugin-codex"},{"id":"dev.bsbctl.codex-quota","kind":"plugin","version":"0.1.0","tag":"plugin/codex-quota/v0.1.0","package":"./cmd/bsbctl-plugin-codex-quota","binary":"bsbctl-plugin-codex-quota"},{"id":"dev.bsbctl.mac-resources","kind":"plugin","version":"0.1.0","tag":"plugin/mac-resources/v0.1.0","package":"./cmd/bsbctl-plugin-mac-resources","binary":"bsbctl-plugin-mac-resources"}]}`
+const validReleasePlan = `{"schema_version":1,"components":[{"id":"bsbctl","kind":"core","version":"0.1.0","tag":"v0.1.0","package":"./cmd/bsbctl","binary":"bsbctl"},{"id":"dev.bsbctl.calendar","kind":"plugin","version":"0.1.0","tag":"plugin/calendar/v0.1.0","package":"./cmd/bsbctl-plugin-calendar","binary":"bsbctl-plugin-calendar"},{"id":"dev.bsbctl.codex","kind":"plugin","version":"0.1.0","tag":"plugin/codex/v0.1.0","package":"./cmd/bsbctl-plugin-codex","binary":"bsbctl-plugin-codex"},{"id":"dev.bsbctl.codex-quota","kind":"plugin","version":"0.1.0","tag":"plugin/codex-quota/v0.1.0","package":"./cmd/bsbctl-plugin-codex-quota","binary":"bsbctl-plugin-codex-quota"},{"id":"dev.bsbctl.github-notifications","kind":"plugin","version":"0.1.0","tag":"plugin/github-notifications/v0.1.0","package":"./cmd/bsbctl-plugin-github-notifications","binary":"bsbctl-plugin-github-notifications"},{"id":"dev.bsbctl.mac-resources","kind":"plugin","version":"0.1.0","tag":"plugin/mac-resources/v0.1.0","package":"./cmd/bsbctl-plugin-mac-resources","binary":"bsbctl-plugin-mac-resources"}]}`
 
 func writeFixtureFile(t *testing.T, path, content string) {
 	t.Helper()

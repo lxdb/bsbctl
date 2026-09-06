@@ -19,11 +19,13 @@ func TestDecodePlanRequiresIndependentStableComponentMetadata(t *testing.T) {
 		`{"id":"dev.bsbctl.calendar","kind":"plugin","version":"0.1.0","tag":"plugin/calendar/v0.1.0","package":"./cmd/bsbctl-plugin-calendar","binary":"bsbctl-plugin-calendar"},` +
 		`{"id":"dev.bsbctl.codex","kind":"plugin","version":"0.1.0","tag":"plugin/codex/v0.1.0","package":"./cmd/bsbctl-plugin-codex","binary":"bsbctl-plugin-codex"},` +
 		`{"id":"dev.bsbctl.codex-quota","kind":"plugin","version":"0.2.0","tag":"plugin/codex-quota/v0.2.0","package":"./cmd/bsbctl-plugin-codex-quota","binary":"bsbctl-plugin-codex-quota"},` +
+		`{"id":"dev.bsbctl.github-notifications","kind":"plugin","version":"0.1.0","tag":"plugin/github-notifications/v0.1.0","package":"./cmd/bsbctl-plugin-github-notifications","binary":"bsbctl-plugin-github-notifications"},` +
 		`{"id":"dev.bsbctl.mac-resources","kind":"plugin","version":"1.0.0","tag":"plugin/mac-resources/v1.0.0","package":"./cmd/bsbctl-plugin-mac-resources","binary":"bsbctl-plugin-mac-resources"}]}`))
+
 	if err != nil {
 		t.Fatalf("DecodePlan: %v", err)
 	}
-	if len(plan.Components) != 5 || plan.Components[0].Tag != "v0.1.0" || plan.Components[1].Tag != "plugin/calendar/v0.1.0" || plan.Components[2].Tag != "plugin/codex/v0.1.0" || plan.Components[3].Version != "0.2.0" || plan.Components[4].Version != "1.0.0" {
+	if len(plan.Components) != 6 || plan.Components[0].Tag != "v0.1.0" || plan.Components[1].Tag != "plugin/calendar/v0.1.0" || plan.Components[2].Tag != "plugin/codex/v0.1.0" || plan.Components[3].Version != "0.2.0" || plan.Components[4].Tag != "plugin/github-notifications/v0.1.0" || plan.Components[5].Version != "1.0.0" {
 		t.Fatalf("plan = %#v", plan)
 	}
 }

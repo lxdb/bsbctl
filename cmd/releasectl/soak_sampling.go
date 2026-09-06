@@ -140,8 +140,9 @@ func discoverDaemonTree(ctx context.Context, parentPID int) ([]soak.ProcessIdent
 }
 
 func validateSoakDescendants(descendants []int) error {
-	if len(descendants) != 2 {
-		return fmt.Errorf("bsbctl process tree has %d descendants, want exactly 2 resident plugins", len(descendants))
+	want := len(releaseSoakPluginDescriptors())
+	if len(descendants) != want {
+		return fmt.Errorf("bsbctl process tree has %d descendants, want exactly %d resident plugins", len(descendants), want)
 	}
 	seen := make(map[int]struct{}, len(descendants))
 	for _, pid := range descendants {
@@ -163,7 +164,7 @@ func listDescendantPIDs(ctx context.Context, parentPID int) ([]int, error) {
 	const maximumDescendants = 64
 	seen := map[int]struct{}{parentPID: {}}
 	queue := []int{parentPID}
-	descendants := make([]int, 0, 2)
+	descendants := make([]int, 0, len(releaseSoakPluginDescriptors()))
 	for len(queue) > 0 {
 		parent := queue[0]
 		queue = queue[1:]

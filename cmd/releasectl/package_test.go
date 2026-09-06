@@ -26,6 +26,7 @@ import (
 	calendarplugin "github.com/lxdb/bsbctl/plugins/calendar"
 	codexplugin "github.com/lxdb/bsbctl/plugins/codex"
 	"github.com/lxdb/bsbctl/plugins/codexquota"
+	"github.com/lxdb/bsbctl/plugins/githubnotifications"
 	"github.com/lxdb/bsbctl/plugins/macresources"
 	pluginsdk "github.com/lxdb/bsbctl/sdk/plugin"
 	"github.com/lxdb/bsbctl/sdk/protocol"
@@ -58,10 +59,11 @@ func assertPackagedManifestMatchesDefinition(t *testing.T, data []byte, expected
 
 func TestArchiveComponentContractsReferenceCanonicalPluginDefinitions(t *testing.T) {
 	want := map[string]func(string) pluginsdk.Definition{
-		calendarplugin.PluginID: calendarplugin.DefinitionForVersion,
-		codexplugin.PluginID:    codexplugin.DefinitionForVersion,
-		codexquota.PluginID:     codexquota.DefinitionForVersion,
-		macresources.PluginID:   macresources.DefinitionForVersion,
+		calendarplugin.PluginID:      calendarplugin.DefinitionForVersion,
+		codexplugin.PluginID:         codexplugin.DefinitionForVersion,
+		codexquota.PluginID:          codexquota.DefinitionForVersion,
+		githubnotifications.PluginID: githubnotifications.DefinitionForVersion,
+		macresources.PluginID:        macresources.DefinitionForVersion,
 	}
 	for id, definitionForVersion := range want {
 		contract, exists := archiveComponentContracts[id]
@@ -89,7 +91,7 @@ func TestRunPackageIsDeterministicAndInspectDetectsTampering(t *testing.T) {
 	for _, output := range []string{first, second} {
 		var stdout, stderr bytes.Buffer
 		code := run([]string{"package", "--root", root, "--out", output, "--goos", "darwin", "--goarch", "arm64", "--source-date-epoch", "1700000000"}, &stdout, &stderr)
-		if code != exitSuccess || stderr.Len() != 0 || !strings.Contains(stdout.String(), "packaged 5 component(s)") {
+		if code != exitSuccess || stderr.Len() != 0 || !strings.Contains(stdout.String(), "packaged 6 component(s)") {
 			t.Fatalf("package exit=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 		}
 		if err := verifyArtifactDirectory(output); err != nil {
@@ -786,11 +788,12 @@ func packageFixture(t *testing.T) string {
 	}
 	t.Cleanup(func() { listReleaseComponentDependencies = previousLister })
 	root := t.TempDir()
-	writeReleaseFile(t, filepath.Join(root, "release", "versions.json"), `{"schema_version":1,"components":[{"id":"bsbctl","kind":"core","version":"0.1.0","tag":"v0.1.0","package":"./cmd/bsbctl","binary":"bsbctl"},{"id":"dev.bsbctl.calendar","kind":"plugin","version":"0.5.0","tag":"plugin/calendar/v0.5.0","package":"./cmd/bsbctl-plugin-calendar","binary":"bsbctl-plugin-calendar"},{"id":"dev.bsbctl.codex","kind":"plugin","version":"0.4.0","tag":"plugin/codex/v0.4.0","package":"./cmd/bsbctl-plugin-codex","binary":"bsbctl-plugin-codex"},{"id":"dev.bsbctl.codex-quota","kind":"plugin","version":"0.2.0","tag":"plugin/codex-quota/v0.2.0","package":"./cmd/bsbctl-plugin-codex-quota","binary":"bsbctl-plugin-codex-quota"},{"id":"dev.bsbctl.mac-resources","kind":"plugin","version":"0.3.0","tag":"plugin/mac-resources/v0.3.0","package":"./cmd/bsbctl-plugin-mac-resources","binary":"bsbctl-plugin-mac-resources"}]}`)
+	writeReleaseFile(t, filepath.Join(root, "release", "versions.json"), `{"schema_version":1,"components":[{"id":"bsbctl","kind":"core","version":"0.1.0","tag":"v0.1.0","package":"./cmd/bsbctl","binary":"bsbctl"},{"id":"dev.bsbctl.calendar","kind":"plugin","version":"0.5.0","tag":"plugin/calendar/v0.5.0","package":"./cmd/bsbctl-plugin-calendar","binary":"bsbctl-plugin-calendar"},{"id":"dev.bsbctl.codex","kind":"plugin","version":"0.4.0","tag":"plugin/codex/v0.4.0","package":"./cmd/bsbctl-plugin-codex","binary":"bsbctl-plugin-codex"},{"id":"dev.bsbctl.codex-quota","kind":"plugin","version":"0.2.0","tag":"plugin/codex-quota/v0.2.0","package":"./cmd/bsbctl-plugin-codex-quota","binary":"bsbctl-plugin-codex-quota"},{"id":"dev.bsbctl.github-notifications","kind":"plugin","version":"0.1.0","tag":"plugin/github-notifications/v0.1.0","package":"./cmd/bsbctl-plugin-github-notifications","binary":"bsbctl-plugin-github-notifications"},{"id":"dev.bsbctl.mac-resources","kind":"plugin","version":"0.3.0","tag":"plugin/mac-resources/v0.3.0","package":"./cmd/bsbctl-plugin-mac-resources","binary":"bsbctl-plugin-mac-resources"}]}`)
 	writeReleaseFile(t, filepath.Join(root, "release", "dependencies.json"), `{"schema_version":1,"modules":[{"module":"github.com/coder/websocket","version":"v1.8.15","license":"ISC","license_sha256":"cc0975a5f6305145bdd7b41ce9479632fdac3870e6ac4281f28017f18c767c4e"}]}`)
 	writeReleaseFile(t, filepath.Join(root, "plugins", "codex", "config.schema.json"), `{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","additionalProperties":false}`)
 	writeReleaseFile(t, filepath.Join(root, "plugins", "calendar", "config.schema.json"), `{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"reminder_lead_minutes":{"type":"integer","minimum":1,"maximum":60}},"additionalProperties":false}`)
 	writeReleaseFile(t, filepath.Join(root, "plugins", "codexquota", "config.schema.json"), `{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","additionalProperties":false}`)
+	writeReleaseFile(t, filepath.Join(root, "plugins", "githubnotifications", "config.schema.json"), `{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","additionalProperties":false}`)
 	writeReleaseFile(t, filepath.Join(root, "plugins", "macresources", "config.schema.json"), `{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","additionalProperties":false}`)
 	mark, err := os.ReadFile(filepath.Join("..", "..", "plugins", "codexquota", "assets", "codex-mark.png"))
 	if err != nil {
@@ -798,6 +801,11 @@ func packageFixture(t *testing.T) string {
 	}
 	writeReleaseFile(t, filepath.Join(root, "plugins", "codexquota", "assets", "codex-mark.png"), string(mark))
 	writeReleaseFile(t, filepath.Join(root, "plugins", "codex", "assets", "codex-mark.png"), string(mark))
+	githubMark, err := os.ReadFile(filepath.Join("..", "..", "plugins", "githubnotifications", "assets", "github-mark.png"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeReleaseFile(t, filepath.Join(root, "plugins", "githubnotifications", "assets", "github-mark.png"), string(githubMark))
 	writeReleaseFile(t, filepath.Join(root, "LICENSE"), "license\n")
 	writeReleaseFile(t, filepath.Join(root, "NOTICE"), "notice\n")
 	writeReleaseFile(t, filepath.Join(root, "THIRD_PARTY_NOTICES.md"), "third party\n")

@@ -39,7 +39,7 @@ func TestRunCatalogBuildsStableMetadataOnlyFromVerifiedPluginArtifacts(t *testin
 		"--generated-at", "2026-08-22T11:00:00Z", "--out", catalogPath,
 	}
 	var stdout, stderr bytes.Buffer
-	if code := run(args, &stdout, &stderr); code != exitSuccess || stdout.String() != "stable catalog: written with 8 platform entries\n" || stderr.Len() != 0 {
+	if code := run(args, &stdout, &stderr); code != exitSuccess || stdout.String() != "stable catalog: written with 10 platform entries\n" || stderr.Len() != 0 {
 		t.Fatalf("catalog exit=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 	data, err := os.ReadFile(catalogPath)
@@ -61,8 +61,8 @@ func TestRunCatalogBuildsStableMetadataOnlyFromVerifiedPluginArtifacts(t *testin
 	if err != nil {
 		t.Fatalf("catalog.Verify: %v", err)
 	}
-	if len(verified.Plugins) != 8 {
-		t.Fatalf("plugin entries = %d, want 8", len(verified.Plugins))
+	if len(verified.Plugins) != 10 {
+		t.Fatalf("plugin entries = %d, want 10", len(verified.Plugins))
 	}
 	for _, entry := range verified.Plugins {
 		if entry.ID == "bsbctl" || !strings.HasPrefix(entry.URL, "https://github.com/lxdb/bsbctl/releases/download/plugin%2F") {

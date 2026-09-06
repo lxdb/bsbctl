@@ -130,7 +130,7 @@ func TestCollectSoakSamplesFailsOnTreeChange(t *testing.T) {
 		treeCalls++
 		tree := append([]soak.ProcessIdentity(nil), identities...)
 		if treeCalls == 2 {
-			tree = append(tree, soak.ProcessIdentity{PID: 104, PPID: 102, Name: "leaked-child"})
+			tree = append(tree, soak.ProcessIdentity{PID: 105, PPID: 102, Name: "leaked-child"})
 		}
 		return tree, nil
 	}
@@ -205,7 +205,7 @@ func TestCollectSoakSamplesRechecksHealthForEverySuccessfulSample(t *testing.T) 
 		t.Fatalf("samples/status/tree/count calls = %d/%d/%d/%d, want 3/3/3/3", len(samples), statusCalls, treeCalls, countCalls)
 	}
 	for index, sample := range samples {
-		if sample.Health.DevicePhase != device.PhaseReady || len(sample.Health.Processes) != 3 || sample.Health.FakeRequests.StateMessages != int64(index+2) {
+		if sample.Health.DevicePhase != device.PhaseReady || len(sample.Health.Processes) != 4 || sample.Health.FakeRequests.StateMessages != int64(index+2) {
 			t.Fatalf("sample %d health = %#v", index+1, sample.Health)
 		}
 	}
@@ -213,7 +213,7 @@ func TestCollectSoakSamplesRechecksHealthForEverySuccessfulSample(t *testing.T) 
 
 func TestValidateSoakDescendantsRejectsChildLeak(t *testing.T) {
 	t.Parallel()
-	if err := validateSoakDescendants([]int{102, 103, 104}); err == nil || !strings.Contains(err.Error(), "3 descendants") {
+	if err := validateSoakDescendants([]int{102, 103, 104, 105, 106}); err == nil || !strings.Contains(err.Error(), "5 descendants") {
 		t.Fatalf("validateSoakDescendants error = %v, want child leak", err)
 	}
 }
@@ -221,7 +221,7 @@ func TestValidateSoakDescendantsRejectsChildLeak(t *testing.T) {
 func TestCleanupSoakRuntimeFailsOnSocketLeak(t *testing.T) {
 	t.Parallel()
 	hooks := soakCleanupHooks{
-		Descendants: func(context.Context, int) ([]int, error) { return []int{102, 103}, nil },
+		Descendants: func(context.Context, int) ([]int, error) { return []int{102, 103, 104, 105}, nil },
 		Stop:        func() error { return nil },
 		ProcessAlive: func(int) (bool, error) {
 			return false, nil
@@ -241,7 +241,7 @@ func TestCleanupSoakRuntimeProvesDaemonChildrenAndDescendantsExit(t *testing.T) 
 	stopCalls := 0
 	waitCalls := 0
 	hooks := soakCleanupHooks{
-		Descendants: func(context.Context, int) ([]int, error) { return []int{102, 103, 104}, nil },
+		Descendants: func(context.Context, int) ([]int, error) { return []int{102, 103, 104, 105}, nil },
 		Stop: func() error {
 			stopCalls++
 			return nil
@@ -262,7 +262,7 @@ func TestCleanupSoakRuntimeProvesDaemonChildrenAndDescendantsExit(t *testing.T) 
 	if stopCalls != 1 || waitCalls != 0 {
 		t.Fatalf("stop calls = %d, wait calls = %d, want 1 and 0", stopCalls, waitCalls)
 	}
-	for _, pid := range []int{101, 102, 103, 104} {
+	for _, pid := range []int{101, 102, 103, 104, 105} {
 		if checked[pid] != 1 {
 			t.Fatalf("pid %d checks = %d, want 1", pid, checked[pid])
 		}
@@ -307,6 +307,7 @@ func testSoakIdentities() []soak.ProcessIdentity {
 	return []soak.ProcessIdentity{
 		{PID: 101, PPID: 1, Name: soak.DaemonName},
 		{PID: 103, PPID: 101, Name: soak.CodexQuotaName},
+		{PID: 104, PPID: 101, Name: soak.GitHubNotificationsName},
 		{PID: 102, PPID: 101, Name: soak.MacResourcesName},
 	}
 }
@@ -316,10 +317,12 @@ func testSoakStatus(lastStateAt time.Time) control.Status {
 		Device: device.RuntimeStatus{Phase: device.PhaseReady, LastStateAt: lastStateAt},
 		Plugins: []pluginhost.PluginStatus{
 			{ID: "dev.bsbctl.codex-quota", Phase: pluginhost.PhaseRunning, Running: true, Healthy: true},
+			{ID: "dev.bsbctl.github-notifications", Phase: pluginhost.PhaseRunning, Running: true, Healthy: true},
 			{ID: "dev.bsbctl.mac-resources", Phase: pluginhost.PhaseRunning, Running: true, Healthy: true},
 		},
 		Readiness: []daemon.AppReadiness{
 			{AppID: "codex-quota", Phase: daemon.AppReady},
+			{AppID: "github-notifications", Phase: daemon.AppReady},
 			{AppID: "mac-resources", Phase: daemon.AppReady},
 		},
 	}
