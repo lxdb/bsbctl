@@ -160,8 +160,13 @@ func TestOpenReadFailureAndDismissHaveDifferentEffects(t *testing.T) {
 			startPanel(t, h, w, true)
 			if tc.dismiss {
 				rotate(t, h, w, 1, 1)
+				rotate(t, h, w, 2, 1)
 			}
-			if _, err := press(h, w, 2, protocol.ButtonStart); err == nil {
+			sequence := uint64(2)
+			if tc.dismiss {
+				sequence = 3
+			}
+			if _, err := press(h, w, sequence, protocol.ButtonStart); err == nil {
 				t.Fatal("rejected read reported success")
 			}
 			expectedOpens := 1

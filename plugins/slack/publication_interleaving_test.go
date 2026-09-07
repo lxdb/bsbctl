@@ -35,7 +35,7 @@ func TestResidentBatchDoesNotPublishPendingEpisodeAfterHandleCommit(t *testing.T
 		t.Fatal("fixture has no pending target")
 	}
 	w.panelMu.Lock()
-	w.panel = &panelSession{token: "session-1", started: fixtureNow, level: panelDismiss, target: selected}
+	w.panel = &panelSession{token: "session-1", started: fixtureNow, level: panelDetail, action: panelHandle, target: selected}
 	w.panelMu.Unlock()
 	completed := make(chan struct{})
 	host.complete = func() error { close(completed); return nil }
@@ -99,7 +99,7 @@ func TestInflightObsoleteAttentionRetractsBeforeNextBatchPublication(t *testing.
 				w.reduce(callback("EvDelete", fmt.Sprintf(`{"type":"message","subtype":"message_deleted","channel":"D123","channel_type":"im","deleted_ts":%q,"event_ts":"3.000001"}`, selected.MessageTS)))
 			} else {
 				w.panelMu.Lock()
-				w.panel = &panelSession{token: "session-1", started: fixtureNow, level: panelDismiss, target: selected}
+				w.panel = &panelSession{token: "session-1", started: fixtureNow, level: panelDetail, action: panelHandle, target: selected}
 				w.panelMu.Unlock()
 				completed := make(chan struct{})
 				host.complete = func() error { close(completed); return nil }

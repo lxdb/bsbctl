@@ -2,6 +2,7 @@ package slack
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -35,7 +36,7 @@ func assertSceneBounds(t *testing.T, scene protocol.Scene) {
 }
 
 func TestAttentionSceneUsesNotificationHierarchyAndSlackIdentity(t *testing.T) {
-	scene := detailScene(config{}, workerSnapshot{Fresh: true}, activity{Kind: "channel", Mention: true, Alias: "BUILD"}, 0, fixtureNow)
+	scene := detailScene(config{}, workerSnapshot{Fresh: true}, activity{Kind: "channel", Mention: true, Alias: "BUILD"}, panelOpen, fixtureNow)
 	elements := make(map[string]protocol.Element, len(scene.Elements))
 	for _, element := range scene.Elements {
 		elements[element.ID] = element
@@ -59,6 +60,27 @@ func TestAttentionSceneUsesNotificationHierarchyAndSlackIdentity(t *testing.T) {
 	back := elements["back-line-0"]
 	if back.X != 4 || back.Y != 4 || back.Text == nil || back.Text.Font != "small" || back.Text.Width != 152 {
 		t.Fatalf("back headline = %+v", back)
+	}
+}
+
+func TestListSceneShowsDetailsWithoutAdvertisingAnExternalAction(t *testing.T) {
+	scene := listScene(config{}, workerSnapshot{Fresh: true}, activity{Kind: "dm"}, fixtureNow)
+	assertSceneBounds(t, scene)
+	var rear []string
+	for _, element := range scene.Elements {
+		if element.Text == nil {
+			continue
+		}
+		if strings.Contains(element.Text.Value, "OPEN IN SLACK") || strings.Contains(element.Text.Value, "TURN ACTION") {
+			t.Errorf("list advertises a detail action: %q", element.Text.Value)
+		}
+		if element.Display == protocol.DisplayBack {
+			rear = append(rear, element.Text.Value)
+		}
+	}
+	text := strings.Join(rear, "\n")
+	if strings.Count(text, "PLAY: DETAILS") != 1 || !strings.Contains(text, "TURN SELECT / BACK CLOSE") {
+		t.Fatalf("list guidance = %q", text)
 	}
 }
 
@@ -97,7 +119,7 @@ func TestSceneDefaultsPrivacyBoundsAndExplicitStaleness(t *testing.T) {
 	for _, phase := range []string{"ready", "unconfigured", "degraded", "auth_required"} {
 		s.Phase = phase
 		s.Fresh = phase == "ready"
-		scenes := []protocol.Scene{summaryScene(w.cfg, s), detailScene(w.cfg, s, a, 0, fixtureNow)}
+		scenes := []protocol.Scene{summaryScene(w.cfg, s), detailScene(w.cfg, s, a, panelOpen, fixtureNow)}
 		for _, scene := range scenes {
 			assertSceneBounds(t, scene)
 			raw, _ := json.Marshal(scene)
@@ -115,27 +137,36 @@ func TestOptionalPreviewIsBoundedPagedAndRearOnly(t *testing.T) {
 	w.cfg.rearDetails = true
 	s := w.snapshot()
 	a := s.Items[0]
-	a.Preview = "FIRST\n" + strings.Repeat("private", 30) + "LAST"
-	var pages []string
-	for page := range 4 {
-		scene := detailScene(w.cfg, s, a, page, fixtureNow)
+	a.Preview = strings.Repeat("A", 48) + strings.Repeat("B", 48) + strings.Repeat("C", 48) + "FINAL\nPAGE123456" + "CLIPPED"
+	for page, body := range []string{strings.Repeat("A", 48), strings.Repeat("B", 48), strings.Repeat("C", 48), "FINAL PAGE123456"} {
+		scene := readerScene(s, &panelSession{target: a, page: page}, fixtureNow)
 		assertSceneBounds(t, scene)
-		var rear strings.Builder
+		var rows []string
+		position, controls := "", ""
 		for _, e := range scene.Elements {
 			if e.Text == nil {
 				continue
 			}
-			if e.Display == protocol.DisplayFront && strings.Contains(e.Text.Value, "private") {
-				t.Fatal("private preview on front")
+			if e.Display == protocol.DisplayFront && (strings.Contains(e.Text.Value, "AAAA") || strings.Contains(e.Text.Value, "BBBB") || strings.Contains(e.Text.Value, "CCCC") || strings.Contains(e.Text.Value, "FINAL")) {
+				t.Fatalf("message body appeared on front: %q", e.Text.Value)
 			}
 			if e.Display == protocol.DisplayBack {
-				rear.WriteString(e.Text.Value)
+				switch e.ID {
+				case "back-line-1", "back-line-2":
+					rows = append(rows, e.Text.Value)
+				case "back-line-3":
+					position = e.Text.Value
+				case "back-line-4":
+					controls = e.Text.Value
+				}
 			}
 		}
-		pages = append(pages, rear.String())
-	}
-	if pages[0] == pages[1] || strings.Contains(strings.Join(pages, ""), "LAST") || strings.Contains(strings.Join(pages, ""), "\n") {
-		t.Fatal("preview paging/bound broken")
+		if got := strings.Join(rows, ""); got != body {
+			t.Errorf("page %d body = %q, want %q", page+1, got, body)
+		}
+		if position != fmt.Sprintf("PAGE %d/4 / TURN SCROLL", page+1) || controls != "BACK ACTIONS" {
+			t.Errorf("page %d controls = %q / %q", page+1, position, controls)
+		}
 	}
 }
 func TestNativeTargetRejectsInjectedProviderIdentifiers(t *testing.T) {

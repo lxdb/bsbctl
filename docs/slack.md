@@ -147,7 +147,13 @@ A delivered matching `tokens_revoked` or `app_uninstalled` event invalidates aut
 
 `Dismiss` removes only the selected local episode after its checkpoint is saved. Neither action calls a Slack read-state API; the desktop client controls its own read behavior. The `status` query reports `pending_count`, current `connected` state, persistent `coverage_incomplete`, and actual local-result `truncated` state. The `items` query returns only pending local episodes without a provider request; its `truncated` field reports local result truncation, not historical provider coverage.
 
-Turn the encoder to select an item. START on an attention card opens its selected conversation. Turning the encoder promotes that attention directly to Dismiss. In the manual list, OK opens the selected item details. In the detail view, START opens Slack and the encoder selects Dismiss. START confirms Dismiss, and BACK returns to the list. Each action requires the host execution grant and completes the session once.
+Play/Pause on an attention card opens its selected conversation. Turning the knob on that card opens the action selector with Open in Slack selected; later turns change the selected action.
+
+In the manual list, turn the knob to select an item and press Play/Pause to open its details. In details, turn the knob to select Open in Slack, Dismiss, or Read message. Read message is available only when rear details are enabled and the item has message content. Press Play/Pause to apply the selected action, or BACK to return to the list. Open and Dismiss require the host execution grant and complete the session once.
+
+In the message reader, turn the knob to scroll pages and press BACK to return to the actions. Pressing the knob has no effect in any Slack view.
+
+If a manual panel opens empty, new arrivals show `TURN TO SELECT`. Turn the knob to select an item before pressing Play/Pause. Background updates do not choose a target for that panel.
 
 ## Live checks before relying on the app
 

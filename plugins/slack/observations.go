@@ -122,7 +122,7 @@ func (w *worker) publishResident(ctx context.Context) error {
 				break
 			}
 			n++
-			add(ChannelAttention, a.ID, a.Kind, protocol.ImpactNotable, detailScene(w.cfg, s, a, 0, now), a)
+			add(ChannelAttention, a.ID, a.Kind, protocol.ImpactNotable, detailScene(w.cfg, s, a, panelOpen, now), a)
 		}
 	}
 	if w.cfg.configured && (s.Phase != "ready" || now.Before(s.NoticeUntil)) {

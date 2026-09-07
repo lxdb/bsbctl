@@ -17,16 +17,16 @@ type panelLevel int
 const (
 	panelList panelLevel = iota
 	panelDetail
-	panelConfirm
 )
 
 type interactionSession struct {
-	token        string
-	observedAt   time.Time
-	selected     item
-	level        panelLevel
-	action       int
-	lastSequence uint64
+	token                 string
+	observedAt            time.Time
+	selected              item
+	level                 panelLevel
+	action                int
+	discardOpeningEncoder bool
+	lastSequence          uint64
 }
 
 func openBrowser(ctx context.Context, target string) error {
@@ -84,6 +84,7 @@ func (h *Handler) StartSession(ctx context.Context, r protocol.SessionStartReque
 			}
 			s.selected = i
 			s.level = panelDetail
+			s.discardOpeningEncoder = true
 		case ChannelSummary, ChannelConnection:
 			items := w.state.ordered()
 			if len(items) > 0 {
@@ -142,23 +143,25 @@ func (h *Handler) HandleSessionInput(ctx context.Context, r protocol.SessionInpu
 	}
 	effect := false
 	if encoder := r.Input.Encoder; encoder != nil {
+		if s.discardOpeningEncoder {
+			s.discardOpeningEncoder = false
+			return inputResult(true), w.refreshPanel(ctx)
+		}
 		switch s.level {
 		case panelList:
 			items := w.state.ordered()
 			if len(items) > 0 {
 				index := slices.IndexFunc(items, func(i item) bool { return i.ID == s.selected.ID })
 				if index < 0 {
-					index = 0
+					// A rotation is deliberate navigation after a selected item
+					// disappeared; it may select a new item, but a button cannot.
+					index = -1
 				}
 				index = (index + int(encoder.Delta)%len(items) + len(items)) % len(items)
 				s.selected = items[index]
 			}
 		case panelDetail:
-			s.level = panelConfirm
-			s.action = 1
-		case panelConfirm:
-			s.level = panelDetail
-			s.action = 0
+			s.action = (s.action + int(encoder.Delta)%2 + 2) % 2
 		}
 	} else if button := r.Input.Button; button.Action == protocol.ButtonPress {
 		switch button.Button {
@@ -166,28 +169,16 @@ func (h *Handler) HandleSessionInput(ctx context.Context, r protocol.SessionInpu
 			if s.level == panelList {
 				return inputResult(false), nil
 			}
-			if s.level == panelConfirm {
-				s.level = panelDetail
-				s.action = 0
-			} else {
-				s.level--
-			}
-		case protocol.ButtonOK:
-			if s.selected.ID == "" {
-				return inputResult(true), nil
-			}
-			if s.level == panelList {
-				s.level = panelDetail
-			}
+			s.level = panelList
+			s.action = 0
 		case protocol.ButtonStart:
-			if s.level == panelConfirm {
-				s.action = 1
-				effect = true
-			} else if s.level == panelList || s.level == panelDetail {
-				if s.selected.ID != "" {
+			if s.selected.ID != "" && s.level == panelList {
+				if w.selectionCurrent(s) {
+					s.level = panelDetail
 					s.action = 0
-					effect = true
 				}
+			} else if s.selected.ID != "" && s.level == panelDetail {
+				effect = true
 			}
 		}
 	} else {

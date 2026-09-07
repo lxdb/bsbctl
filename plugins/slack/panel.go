@@ -13,18 +13,28 @@ type panelLevel int
 const (
 	panelList panelLevel = iota
 	panelDetail
-	panelDismiss
+	panelReader
+)
+
+type panelAction int
+
+const (
+	panelOpen panelAction = iota
+	panelHandle
+	panelRead
 )
 
 type panelSession struct {
-	token        string
-	started      time.Time
-	level        panelLevel
-	index        int
-	target       activity
-	page         int
-	failure      string
-	lastSequence uint64
+	token                 string
+	started               time.Time
+	level                 panelLevel
+	index                 int
+	target                activity
+	action                panelAction
+	page                  int
+	discardOpeningEncoder bool
+	failure               string
+	lastSequence          uint64
 }
 
 func wrapIndex(i, n int) int {
@@ -68,6 +78,7 @@ func (h *Handler) StartSession(ctx context.Context, r protocol.SessionStartReque
 		if ref.Channel == ChannelAttention {
 			p.level = panelDetail
 			p.target = published.target
+			p.discardOpeningEncoder = true
 			w.mu.Lock()
 			err = w.validateTargetLocked(p.target)
 			w.mu.Unlock()
@@ -76,6 +87,13 @@ func (h *Handler) StartSession(ctx context.Context, r protocol.SessionStartReque
 			}
 		} else if ref.Channel != ChannelSummary && ref.Channel != ChannelConnection {
 			return errStaleActivity
+		}
+	}
+	if p.target.ID == "" {
+		items := pendingItems(w.snapshot().Items)
+		if len(items) > 0 {
+			p.target = items[0]
+			p.index = 0
 		}
 	}
 	w.panel = p
@@ -105,13 +123,47 @@ func (h *Handler) HandleSessionInput(ctx context.Context, r protocol.SessionInpu
 	}
 	p.lastSequence = r.Sequence
 	if e := r.Input.Encoder; e != nil {
+		if p.discardOpeningEncoder {
+			p.discardOpeningEncoder = false
+			return inputResult(true), w.publishPanel(ctx)
+		}
 		switch p.level {
 		case panelList:
-			p.index = wrapIndex(p.index+int(e.Delta), len(pendingItems(w.snapshot().Items)))
-		case panelDismiss:
-			p.level = panelDetail
+			items := pendingItems(w.snapshot().Items)
+			if len(items) > 0 {
+				index := p.index
+				if p.target.ID == "" {
+					// Enter the list from the edge matching the turn direction.
+					index = -1
+					if e.Delta < 0 {
+						index = 0
+					}
+				} else {
+					for i, item := range items {
+						if item.ID == p.target.ID {
+							index = i
+							break
+						}
+					}
+				}
+				p.index = wrapIndex(index+int(e.Delta), len(items))
+				p.target = items[p.index]
+				p.failure = ""
+			}
 		case panelDetail:
-			p.level = panelDismiss
+			actions := p.actions(w.cfg)
+			if len(actions) > 0 {
+				index := 0
+				for i, action := range actions {
+					if action == p.action {
+						index = i
+						break
+					}
+				}
+				p.action = actions[wrapIndex(index+int(e.Delta), len(actions))]
+			}
+		case panelReader:
+			p.page = min(max(0, p.page+int(e.Delta)), readerPageCount(p.target.Preview)-1)
 		}
 		return inputResult(true), w.publishPanel(ctx)
 	}
@@ -124,34 +176,63 @@ func (h *Handler) HandleSessionInput(ctx context.Context, r protocol.SessionInpu
 		if p.level == panelList {
 			return inputResult(false), nil
 		}
-		p.level--
+		switch p.level {
+		case panelReader:
+			p.level = panelDetail
+			p.action = panelRead
+		default:
+			p.level = panelList
+		}
 		p.failure = ""
 		return inputResult(true), w.publishPanel(ctx)
-	case protocol.ButtonOK:
+	case protocol.ButtonStart:
 		switch p.level {
 		case panelList:
+			// Background publication cannot select an item for an empty panel.
+			// Require an explicit rotation before a button can open its details.
+			if p.target.ID == "" {
+				return inputResult(true), w.publishPanel(ctx)
+			}
 			s := w.snapshot()
 			s.Items = pendingItems(s.Items)
-			if len(s.Items) == 0 {
-				return inputResult(true), nil
+			found := false
+			for _, item := range s.Items {
+				if item.ID == p.target.ID {
+					p.target = item
+					found = true
+					break
+				}
 			}
-			p.index = wrapIndex(p.index, len(s.Items))
-			p.target = s.Items[p.index]
+			if !found {
+				p.failure = "changed"
+				return inputResult(true), w.publishPanel(ctx)
+			}
 			p.level = panelDetail
 			p.page = 0
+			p.action = panelOpen
 			p.failure = ""
 		case panelDetail:
-			if w.cfg.rearDetails {
-				p.page++
+			switch p.action {
+			case panelOpen:
+				return inputResult(true), h.execute(ctx, w, p, false)
+			case panelHandle:
+				return inputResult(true), h.execute(ctx, w, p, true)
+			case panelRead:
+				p.level = panelReader
+				p.page = 0
 			}
 		}
 		return inputResult(true), w.publishPanel(ctx)
-	case protocol.ButtonStart:
-		if p.level == panelDetail || p.level == panelDismiss {
-			return inputResult(true), h.execute(ctx, w, p, p.level == panelDismiss)
-		}
 	}
-	return inputResult(false), nil
+	return inputResult(true), nil
+}
+
+func (p *panelSession) actions(cfg config) []panelAction {
+	actions := []panelAction{panelOpen, panelHandle}
+	if cfg.rearDetails && p.target.Preview != "" {
+		actions = append(actions, panelRead)
+	}
+	return actions
 }
 func (w *worker) validateTargetLocked(target activity) error {
 	if w.ctx.Err() != nil || !w.snapshot().Fresh {

@@ -99,7 +99,7 @@ func summaryScene(cfg config, s workerSnapshot) protocol.Scene {
 		main = connectionText(s)
 		context += " | coverage gap"
 	}
-	return withContext(textScene(main, []string{"SLACK PENDING", fmt.Sprintf("%d MENTIONS / %d PENDING", c.Mentions, c.Pending), fmt.Sprintf("DM %d / CHANNEL %d / THREAD %d", c.DMs, c.Channels, c.Threads), coverage(s), "OK BROWSE"}, s), context)
+	return withContext(textScene(main, []string{"SLACK PENDING", fmt.Sprintf("%d MENTIONS / %d PENDING", c.Mentions, c.Pending), fmt.Sprintf("DM %d / CHANNEL %d / THREAD %d", c.DMs, c.Channels, c.Threads), coverage(s), "PLAY BROWSE"}, s), context)
 }
 func activityText(a activity) string {
 	if a.Mention {
@@ -114,7 +114,17 @@ func activityText(a activity) string {
 		return "Thread reply"
 	}
 }
-func detailScene(cfg config, s workerSnapshot, a activity, page int, now time.Time) protocol.Scene {
+func detailScene(cfg config, s workerSnapshot, a activity, action panelAction, now time.Time) protocol.Scene {
+	actionText := "PLAY: OPEN IN SLACK"
+	if action == panelHandle {
+		actionText = "PLAY: DISMISS"
+	} else if action == panelRead {
+		actionText = "PLAY: READ MESSAGE"
+	}
+	return activityScene(cfg, s, a, actionText, "TURN ACTION / BACK LIST", now)
+}
+
+func activityScene(cfg config, s workerSnapshot, a activity, actionText, navigation string, now time.Time) protocol.Scene {
 	alias := a.Alias
 	if alias == "" {
 		alias = "DIRECT"
@@ -123,18 +133,11 @@ func detailScene(cfg config, s workerSnapshot, a activity, page int, now time.Ti
 	if cfg.frontMessagePreview && a.Preview != "" {
 		main += ": " + sanitizePreview(a.Preview)
 	}
-	lines := []string{activityText(a) + " / " + alias, fmt.Sprintf("%d MIN AGO / %d MESSAGES", max(0, int(now.Sub(a.UpdatedAt).Minutes())), a.Count), coverage(s), "START OPEN / TURN DISMISS", "BACK LIST"}
-	if cfg.rearDetails && a.Preview != "" {
-		preview := sanitizePreview(a.Preview)
-		pages := (len(preview) + 47) / 48
-		page = wrapIndex(page, pages)
-		part := preview[page*48 : min((page+1)*48, len(preview))]
-		lines = []string{activityText(a) + " / " + alias, part[:min(24, len(part))], part[min(24, len(part)):], fmt.Sprintf("PAGE %d/%d / OK MORE", page+1, pages), "START OPEN / TURN DISMISS"}
-	}
+	lines := []string{activityText(a) + " / " + alias, fmt.Sprintf("%d MIN AGO / %d MESSAGES", max(0, int(now.Sub(a.UpdatedAt).Minutes())), a.Count), actionText, navigation}
 	if !s.Fresh {
 		main = connectionText(s)
 	}
-	scene := withContext(textScene(main, lines, s), alias+" | START OPEN")
+	scene := withContext(textScene(main, lines, s), alias+" | "+actionText)
 	for index := range scene.Elements {
 		if scene.Elements[index].ID == "front-label" {
 			scene.Elements[index].Text.Color = slackWarning
@@ -146,30 +149,51 @@ func detailScene(cfg config, s workerSnapshot, a activity, page int, now time.Ti
 
 func connectionScene(s workerSnapshot) protocol.Scene {
 	c := countPending(s.Items)
-	return withContext(textScene(connectionText(s), []string{"SLACK CONNECTION", coverage(s), "ACTIVITY MAY BE INCOMPLETE", fmt.Sprintf("%d PENDING ITEMS", c.Pending), "OK BROWSE"}, s), "CHECK CONNECTION")
+	return withContext(textScene(connectionText(s), []string{"SLACK CONNECTION", coverage(s), "ACTIVITY MAY BE INCOMPLETE", fmt.Sprintf("%d PENDING ITEMS", c.Pending), "PLAY BROWSE"}, s), "CHECK CONNECTION")
 }
 func panelScene(cfg config, s workerSnapshot, p *panelSession, now time.Time) protocol.Scene {
-	if p.level == panelList {
-		items := pendingItems(s.Items)
-		if len(items) == 0 {
-			return summaryScene(cfg, s)
-		}
-		index := wrapIndex(p.index, len(items))
-		a := items[index]
-		scene := detailScene(cfg, s, a, 0, now)
-		return withListPosition(scene, index+1, len(items))
-	}
 	if p.failure != "" {
 		return textScene("Slack item changed - select it again", []string{"BACK TO LIST"}, s)
 	}
-	if p.level == panelDismiss {
-		alias := p.target.Alias
-		if alias == "" {
-			alias = "DIRECT"
+	if p.level == panelList {
+		items := pendingItems(s.Items)
+		if p.target.ID == "" {
+			if len(items) == 0 {
+				return summaryScene(cfg, s)
+			}
+			return textScene("Turn to select a Slack item", []string{"SLACK PENDING", fmt.Sprintf("%d PENDING ITEMS", len(items)), "TURN TO SELECT", "BACK CLOSE"}, s)
 		}
-		return withContext(textScene("Dismiss this Slack item?", []string{"REMOVE FROM LOCAL PENDING", "START CONFIRM / BACK CANCEL", "SLACK READ STATE IS UNCHANGED"}, s), alias)
+		for index, item := range items {
+			if item.ID == p.target.ID {
+				return withListPosition(listScene(cfg, s, item, now), index+1, len(items))
+			}
+		}
+		return textScene("Slack item changed - turn to select", []string{"BACK TO CLOSE"}, s)
 	}
-	return detailScene(cfg, s, p.target, p.page, now)
+	if p.level == panelReader {
+		return readerScene(s, p, now)
+	}
+	return detailScene(cfg, s, p.target, p.action, now)
+}
+
+func readerScene(s workerSnapshot, p *panelSession, now time.Time) protocol.Scene {
+	preview := sanitizePreview(p.target.Preview)
+	pages := readerPageCount(p.target.Preview)
+	page := min(p.page, pages-1)
+	part := preview[page*48 : min((page+1)*48, len(preview))]
+	alias := p.target.Alias
+	if alias == "" {
+		alias = "DIRECT"
+	}
+	return withContext(textScene(activityText(p.target), []string{activityText(p.target) + " / " + alias, part[:min(24, len(part))], part[min(24, len(part)):], fmt.Sprintf("PAGE %d/%d / TURN SCROLL", page+1, pages), "BACK ACTIONS"}, s), alias+" | READ")
+}
+
+func listScene(cfg config, s workerSnapshot, a activity, now time.Time) protocol.Scene {
+	return activityScene(cfg, s, a, "PLAY: DETAILS", "TURN SELECT / BACK CLOSE", now)
+}
+
+func readerPageCount(preview string) int {
+	return max(1, (len(sanitizePreview(preview))+47)/48)
 }
 func withListPosition(scene protocol.Scene, index, count int) protocol.Scene {
 	scene.Elements = append(scene.Elements, protocol.Element{ID: "back-position", Display: protocol.DisplayBack, X: 4, Y: 72, Text: &protocol.TextElement{Value: fmt.Sprintf("ITEM %d OF %d / TURN SELECT", index, count), Font: "tiny", Color: slackText, Width: 152}})

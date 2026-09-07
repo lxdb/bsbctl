@@ -107,7 +107,7 @@ func TestAuthorizationRevocationBypassesBlockedCheckpointAndFullQueue(t *testing
 	opens := 0
 	h.open = func(context.Context, string) error { opens++; return nil }
 	startPanel(t, h, w, nil)
-	_, _ = press(h, w, protocol.ButtonOK)
+	_, _ = press(h, w, protocol.ButtonStart)
 	if err := w.publishResident(t.Context()); err != nil {
 		t.Fatal(err)
 	}
