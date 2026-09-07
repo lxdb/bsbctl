@@ -31,8 +31,11 @@ func TestConfigDefaultsAndExactEmpty(t *testing.T) {
 			t.Fatal("accepted incomplete/extra secrets")
 		}
 	}
-	if err := cfg.validateSecrets(map[string]string{"app_token": "xapp-local"}); err != nil {
+	if err := cfg.validateSecrets(map[string]string{"app_token": "xapp-local", "user_token": "xoxp-local"}); err != nil {
 		t.Fatal(err)
+	}
+	if err := cfg.validateSecrets(map[string]string{"app_token": "xapp-local"}); err == nil {
+		t.Fatal("explicit channel monitoring accepted without membership token")
 	}
 }
 

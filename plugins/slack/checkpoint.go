@@ -21,13 +21,15 @@ var (
 const checkpointLimit = 64 * 1024
 
 type checkpointJSON struct {
-	SchemaVersion int                  `json:"schema_version"`
-	Scope         string               `json:"scope"`
-	Fingerprints  []messageFingerprint `json:"fingerprints"`
-	Watches       []watch              `json:"watches"`
-	Handled       []handledEpisode     `json:"handled"`
-	Truncated     bool                 `json:"truncated,omitzero"`
-	Revision      uint64               `json:"revision"`
+	SchemaVersion        int                  `json:"schema_version"`
+	Scope                string               `json:"scope"`
+	Fingerprints         []messageFingerprint `json:"fingerprints"`
+	Watches              []watch              `json:"watches"`
+	Handled              []handledEpisode     `json:"handled"`
+	Truncated            bool                 `json:"truncated,omitzero"`
+	UnresolvedMembership bool                 `json:"unresolved_membership,omitzero"`
+	CoverageIncomplete   bool                 `json:"coverage_incomplete,omitzero"`
+	Revision             uint64               `json:"revision"`
 }
 
 // proposeHandle does not mutate the receiver. Save raw successfully before
@@ -70,7 +72,11 @@ func (s *state) proposeHandle(id string, revision uint64, fingerprint string, no
 }
 
 func (s *state) checkpoint(now time.Time) (json.RawMessage, error) {
-	wire := checkpointJSON{SchemaVersion: 1, Scope: s.scope, Truncated: s.truncated, Revision: s.revision}
+	wire := checkpointJSON{
+		SchemaVersion: 1, Scope: s.scope, Truncated: s.truncated,
+		UnresolvedMembership: s.unresolvedMembership, CoverageIncomplete: s.coverageIncomplete,
+		Revision: s.revision,
+	}
 	for _, value := range s.fingerprints {
 		wire.Fingerprints = append(wire.Fingerprints, value)
 	}
@@ -164,6 +170,8 @@ func (s *state) restoreCheckpoint(raw json.RawMessage, now time.Time) error {
 	s.watches = watches
 	s.handled = handled
 	s.truncated = wire.Truncated
+	s.unresolvedMembership = wire.UnresolvedMembership
+	s.coverageIncomplete = wire.CoverageIncomplete
 	s.revision = wire.Revision
 	return nil
 }

@@ -20,10 +20,13 @@ import (
 func diagnosticWorker(t *testing.T, host *checkpointHost, checkpoint json.RawMessage) *worker {
 	t.Helper()
 	client := newSlackClient(&http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		if r.URL.Path == "/api/conversations.info" {
+			return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`{"ok":true,"channel":{"id":"C123","name":"PUBLIC","is_member":true}}`))}, nil
+		}
 		return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`{"ok":true,"url":"wss://wss-primary.slack.com/socket?ticket=ticket-canary"}`))}, nil
 	})})
 	cfg, _ := decodeConfig([]byte(`{"app_id":"A123","workspace_id":"T123","user_id":"U123","channels":[{"id":"C123","alias":"PUBLIC"}]}`))
-	w := newWorker(protocol.Instance{ID: "slack", Generation: 1, Checkpoint: checkpoint, Secrets: map[string]string{"app_token": "app-canary"}}, cfg, host, client, blockedDial, time.Now)
+	w := newWorker(protocol.Instance{ID: "slack", Generation: 1, Checkpoint: checkpoint, Secrets: map[string]string{"app_token": "app-canary", "user_token": "user-canary"}}, cfg, host, client, blockedDial, time.Now)
 	go w.run()
 	t.Cleanup(func() { w.cancel(); <-w.done })
 	synctest.Wait()

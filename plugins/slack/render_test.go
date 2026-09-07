@@ -75,6 +75,19 @@ func TestSummaryUsesFullWorkspaceLabelWithMarquee(t *testing.T) {
 	}
 	t.Fatal("workspace context is missing")
 }
+
+func TestConnectedCoverageGapDoesNotMasqueradeAsReconnect(t *testing.T) {
+	s := workerSnapshot{Phase: "ready", Fresh: true, Gap: true, Items: []activity{{Kind: "channel"}}}
+	scene := summaryScene(config{label: "Slack"}, s)
+	raw, err := json.Marshal(scene)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(raw)
+	if !strings.Contains(text, "1 channels") || !strings.Contains(text, "Earlier activity may be incomp") || strings.Contains(text, "reconnecting") {
+		t.Fatalf("connected gap scene = %s", raw)
+	}
+}
 func TestSceneDefaultsPrivacyBoundsAndExplicitStaleness(t *testing.T) {
 	_, w, _ := panelFixture(t)
 	s := w.snapshot()

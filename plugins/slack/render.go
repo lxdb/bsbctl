@@ -23,8 +23,12 @@ func coverage(s workerSnapshot) string {
 		return "Access expired"
 	case !s.Fresh:
 		return "Waiting for fresh activity"
-	case s.Gap || s.Truncated || len(attentionItems(s.Items)) > 32:
-		return "Coverage gap"
+	case s.Truncated:
+		return "Local history is truncated"
+	case s.Gap:
+		return "Earlier activity may be incomplete"
+	case len(attentionItems(s.Items)) > 32:
+		return "Some attention is list-only"
 	case s.Phase == "degraded":
 		return "Activity may be incomplete"
 	default:
@@ -45,6 +49,8 @@ func connectionText(s workerSnapshot) string {
 		return "Slack access is incomplete - update the app subscriptions and user scopes"
 	case s.ErrorCode == "throttled":
 		return "Slack rate limit reached - activity may be incomplete"
+	case s.Phase == "ready" && s.CoverageIncomplete:
+		return "Earlier activity may be incomplete"
 	default:
 		return "Slack activity may be incomplete - reconnecting"
 	}
@@ -89,7 +95,7 @@ func summaryScene(cfg config, s workerSnapshot) protocol.Scene {
 	} else if s.Phase == "auth_required" {
 		main = connectionText(s)
 		context = "TOKEN"
-	} else if !s.Fresh || s.Gap || s.Truncated || s.OpenUnsaved {
+	} else if !s.Fresh || s.Phase != "ready" || s.OpenUnsaved {
 		main = connectionText(s)
 		context += " | coverage gap"
 	}

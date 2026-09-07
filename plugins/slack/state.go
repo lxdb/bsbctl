@@ -2,7 +2,6 @@ package slack
 
 import (
 	"cmp"
-	"encoding/json"
 	"maps"
 	"slices"
 	"time"
@@ -65,20 +64,22 @@ type handledEpisode struct {
 // including a handling proposal's save and replacement of the committed state.
 // Snapshots returned by items contain no references to reducer maps.
 type state struct {
-	revision        uint64
-	config          config
-	userID          string
-	scope           string
-	messages        map[string]retainedMessage
-	aggregates      map[string]activity
-	fingerprints    map[string]messageFingerprint
-	watches         map[string]watch
-	explicitWatches map[string]bool
-	handled         map[string]handledEpisode
-	callbacks       map[string]bool
-	callbackFIFO    []string
-	channelNames    map[string]string
-	truncated       bool
+	revision             uint64
+	config               config
+	userID               string
+	scope                string
+	messages             map[string]retainedMessage
+	aggregates           map[string]activity
+	fingerprints         map[string]messageFingerprint
+	watches              map[string]watch
+	explicitWatches      map[string]bool
+	handled              map[string]handledEpisode
+	callbacks            map[string]bool
+	callbackFIFO         []string
+	channelNames         map[string]string
+	truncated            bool
+	unresolvedMembership bool
+	coverageIncomplete   bool
 }
 
 func newState(cfg config, userID string) *state {
@@ -101,26 +102,16 @@ func (s *state) rootKey(channel, ts string) string {
 	return hashParts(s.config.workspaceID, s.userID, channel, ts)
 }
 
-func (s *state) apply(raw json.RawMessage, now time.Time) (bool, error) {
+func (s *state) applyNormalized(event normalizedEvent, now time.Time) bool {
 	if !s.config.configured {
-		return false, nil
+		return false
 	}
-	event, ok, err := normalizeEvent(raw, s.config.appID, s.config.workspaceID, s.userID, s.config.rearDetails || s.config.frontMessagePreview)
-	if err != nil || !ok {
-		return false, err
-	}
-	if s.callbacks[event.callbackID] {
-		return false, nil
-	}
-	s.callbacks[event.callbackID] = true
-	s.callbackFIFO = append(s.callbackFIFO, event.callbackID)
-	if len(s.callbackFIFO) > maxCallbacks {
-		delete(s.callbacks, s.callbackFIFO[0])
-		s.callbackFIFO = s.callbackFIFO[1:]
+	if !s.acceptCallback(event.callbackID) {
+		return false
 	}
 	pruned := s.prune(now)
 	if !s.admits(event) {
-		return pruned, nil
+		return pruned
 	}
 	key := hashParts(s.config.workspaceID, event.channelID, event.ts)
 	old, existed := s.messages[key]
@@ -132,22 +123,22 @@ func (s *state) apply(raw json.RawMessage, now time.Time) (bool, error) {
 	if seen {
 		order := compareTS(event.version, previous.Version)
 		if order < 0 || (order == 0 && event.digest == previous.Digest) {
-			return pruned, nil
+			return pruned
 		}
 		// Conflicting payloads at one provider version have no authoritative order.
 		// Preserve the accepted version, avoiding retry-induced oscillation.
 		if order == 0 {
-			return pruned, nil
+			return pruned
 		}
 	}
 	if event.deleted {
 		s.remember(key, event, now)
 		if !existed {
-			return true, nil
+			return true
 		}
 		delete(s.messages, key)
 		s.rebuild(old.aggregateID, now, false, "")
-		return true, nil
+		return true
 	}
 	root := s.rootKey(event.channelID, event.rootTS)
 	_, watched := s.watches[root]
@@ -161,7 +152,7 @@ func (s *state) apply(raw json.RawMessage, now time.Time) (bool, error) {
 		watched = true
 	}
 	if event.own {
-		return pruned || (s.config.watchParticipatedThreads && !s.explicitWatches[root]), nil
+		return pruned || (s.config.watchParticipatedThreads && !s.explicitWatches[root])
 	}
 	kind := ""
 	dm := event.channelType == "im" || event.channelType == "mpim"
@@ -175,7 +166,7 @@ func (s *state) apply(raw json.RawMessage, now time.Time) (bool, error) {
 	}
 
 	if kind == "" && !existed {
-		return pruned, nil
+		return pruned
 	}
 	if watched {
 		s.touchWatch(root, now)
@@ -184,7 +175,7 @@ func (s *state) apply(raw json.RawMessage, now time.Time) (bool, error) {
 	if kind == "" {
 		delete(s.messages, key)
 		s.rebuild(old.aggregateID, now, false, "")
-		return true, nil
+		return true
 	}
 	aggregateID := "item-" + root
 	newEpisode := !existed || (!old.event.mention && event.mention)
@@ -194,7 +185,40 @@ func (s *state) apply(raw json.RawMessage, now time.Time) (bool, error) {
 	}
 	s.rebuild(aggregateID, now, newEpisode, hashParts(key, event.version, event.digest))
 	s.boundMessages(now)
-	return true, nil
+	return true
+}
+
+func (s *state) acceptCallback(callbackID string) bool {
+	if s.callbacks[callbackID] {
+		return false
+	}
+	s.callbacks[callbackID] = true
+	s.callbackFIFO = append(s.callbackFIFO, callbackID)
+	if len(s.callbackFIFO) > maxCallbacks {
+		delete(s.callbacks, s.callbackFIFO[0])
+		s.callbackFIFO = s.callbackFIFO[1:]
+	}
+	return true
+}
+
+func (s *state) hasAcceptedCallback(callbackID string) bool {
+	return s.callbacks[callbackID]
+}
+
+func (s *state) removeChannel(channelID string, now time.Time) bool {
+	aggregates := make(map[string]bool)
+	for key, message := range s.messages {
+		if message.event.channelID != channelID {
+			continue
+		}
+		aggregates[message.aggregateID] = true
+		delete(s.messages, key)
+	}
+	delete(s.channelNames, channelID)
+	for id := range aggregates {
+		s.rebuild(id, now, false, "")
+	}
+	return len(aggregates) != 0
 }
 
 func (s *state) admits(event normalizedEvent) bool {
