@@ -766,7 +766,7 @@ func requestCard(request *pendingRequest, thread *threadState, now time.Time) Ca
 		card.Channel, card.StateWord, card.DetailLine, card.ReasonCode = ChannelGuidance, "OPEN CODEX", "Use Codex", "codex_wait_question"
 		card.Disposition, card.Impact = protocol.DispositionNotable, protocol.ImpactNotable
 		if request.Interactive {
-			card.Channel, card.StateWord, card.DetailLine = ChannelAttention, "ASK", "START TO ANSWER"
+			card.Channel, card.StateWord, card.DetailLine = ChannelAttention, "ASK", "PLAY TO ANSWER"
 			card.Disposition, card.Impact = protocol.DispositionActionable, protocol.ImpactCritical
 		}
 	}

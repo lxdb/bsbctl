@@ -30,7 +30,7 @@ func TestCalendarReminderSceneMatchesFirmwareAssetAndMarqueeContract(t *testing.
 	if got := calendarElement(t, scene, "back-title"); got.Text == nil || title.Text == nil || got.Text.Value != title.Text.Value || got.Text.Width != 122 || got.Text.Marquee == nil || title.Text.Marquee == nil || got.Text.Marquee.PixelsPerMinute != title.Text.Marquee.PixelsPerMinute {
 		t.Fatalf("back marquee = %#v", got)
 	}
-	if got := calendarElement(t, scene, "back-action").Text; got == nil || got.Value != "START / OPTIONS" {
+	if got := calendarElement(t, scene, "back-action").Text; got == nil || got.Value != "PLAY: OPTIONS" {
 		var value string
 		if got != nil {
 			value = got.Value

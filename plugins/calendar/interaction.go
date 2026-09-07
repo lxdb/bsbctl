@@ -111,7 +111,7 @@ func meetingInteractionScene(session *calendarInteractionSession) protocol.Scene
 		calendarRectangle("back-background", "back", 0, 0, 160, 80, calendarBlack),
 		calendarText("back-title", "back", "EVENT OPTIONS", "normal", calendarWhite, 9, 8, ""),
 		calendarText("back-options", "back", strings.Join(lines, " / "), "small", calendarAccent, 9, 36, ""),
-		calendarText("back-help", "back", "OK CONFIRM / BACK CANCEL", "tiny", calendarSecondary, 9, 62, ""),
+		calendarText("back-help", "back", "PLAY: "+strings.ToUpper(string(session.choices[session.index]))+" / BACK CANCEL", "tiny", calendarSecondary, 9, 62, ""),
 	}}
 }
 
@@ -171,7 +171,7 @@ func (h *Handler) HandleSessionInput(ctx context.Context, request protocol.Sessi
 	switch button.Button {
 	case protocol.ButtonBack:
 		return calendarInputResult(true), worker.finishInteraction(ctx, session.token, true)
-	case protocol.ButtonOK:
+	case protocol.ButtonStart:
 		if !session.applied {
 			executionGranted := false
 			selected, err := worker.state.DecideWithGrant(ctx, session.eventKey, session.choices[session.index], func() error {

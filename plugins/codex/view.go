@@ -42,6 +42,23 @@ func typedQuestionScene(_ Card, questionPosition, questionText, optionPosition s
 	return protocol.Scene{Elements: elements}
 }
 
+func answerReviewScene(_ Card, reviewPosition, questionText, answer string) protocol.Scene {
+	questionText = safeLine(questionText)
+	answer = safeLine(answer)
+	return protocol.Scene{Elements: []protocol.Element{
+		cardRectangle("front-background", "front", 0, 0, 72, 16, canvas),
+		cardImage("front-codex-mark", "front", codexMarkSource, 1, 1),
+		cardMarquee("front-review-answer", "front", answer, "normal", textColor, 18, 1, 53),
+		cardText("front-review-position", "front", reviewPosition, "tiny", warning, 18, 10, ""),
+
+		cardRectangle("back-background", "back", 0, 0, 160, 80, canvas),
+		cardText("back-review-position", "back", reviewPosition, "tiny", warning, 8, 9, ""),
+		cardMarquee("back-review-question", "back", questionText, "normal", textColor, 8, 20, 144),
+		cardMarquee("back-review-answer", "back", answer, "normal", textColor, 8, 43, 144),
+		cardText("back-review-action", "back", "PLAY: SUBMIT / BACK EDIT", "tiny", secondary, 8, 63, ""),
+	}}
+}
+
 func cardScene(card Card) protocol.Scene {
 	state := fitDisplayLine(card.StateWord, 16)
 	if state == "" {
