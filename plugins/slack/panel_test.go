@@ -81,6 +81,8 @@ func panelFixture(t *testing.T) (*Handler, *worker, *panelHost) {
 	cfg := fixtureState(t, "").config
 	h := newHandler(host, nil, nil, func() time.Time { return fixtureNow })
 	w := newWorker(protocol.Instance{ID: "slack", Generation: 1}, cfg, host, nil, nil, h.now)
+	w.setMembershipProofLocked("C123", membershipProof{member: true, name: "BUILD", expires: fixtureNow.Add(membershipPositiveTTL)})
+	w.setMembershipProofLocked("G123", membershipProof{member: true, name: "PRIVATE", expires: fixtureNow.Add(membershipPositiveTTL)})
 	h.workers["slack"] = w
 	t.Cleanup(w.cancel)
 	w.live()

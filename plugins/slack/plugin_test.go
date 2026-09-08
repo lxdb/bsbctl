@@ -148,7 +148,7 @@ func TestHandlerCanceledExactGenerationRestartsAndUnconfiguredIsIdle(t *testing.
 		t.Fatal("unconfigured instance was unhealthy")
 	}
 	status, err := h.InvokeOperation(t.Context(), protocol.OperationRequest{Instance: idle.Ref(), Operation: "status", Payload: []byte(`{}`)})
-	if err != nil || string(status.Payload) != `{"phase":"unconfigured","last_error_code":"","pending_count":0,"truncated":false}` {
+	if err != nil || string(status.Payload) != `{"phase":"unconfigured","last_error_code":"","pending_count":0,"connected":false,"coverage_incomplete":false,"truncated":false}` {
 		t.Fatalf("idle status contract: %s %v", status.Payload, err)
 	}
 	configured := instanceFixture("slack", "T123", 2)
@@ -202,8 +202,29 @@ func TestWorkerFreshnessCannotBeExtendedByCachedReadsOrFailedReconnects(t *testi
 		t.Fatal("failed reconnect extended freshness")
 	}
 	w.live()
-	if !w.snapshot().Fresh || !w.snapshot().Gap || w.snapshot().Phase != "degraded" {
-		t.Fatal("reconnect erased gap or failed to renew liveness")
+	if !w.snapshot().Fresh || !w.snapshot().Gap || w.snapshot().Phase != "ready" {
+		t.Fatal("live connection did not separate current health from earlier coverage loss")
+	}
+	h := newHandler(nil, nil, nil, func() time.Time { return now })
+	h.workers["slack"] = w
+	if !h.Health(t.Context()).Healthy {
+		t.Fatal("earlier coverage loss made the live plugin operationally unhealthy")
+	}
+	statusResult, err := h.InvokeOperation(t.Context(), protocol.OperationRequest{Instance: w.instance.Ref(), Operation: "status", Payload: []byte(`{}`)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var status struct {
+		Connected          bool `json:"connected"`
+		CoverageIncomplete bool `json:"coverage_incomplete"`
+		Truncated          bool `json:"truncated"`
+	}
+	if json.Unmarshal(statusResult.Payload, &status) != nil || !status.Connected || !status.CoverageIncomplete || status.Truncated {
+		t.Fatalf("live coverage status = %s", statusResult.Payload)
+	}
+	itemsResult, err := h.InvokeOperation(t.Context(), protocol.OperationRequest{Instance: w.instance.Ref(), Operation: "items", Payload: []byte(`{}`)})
+	if err != nil || strings.Contains(string(itemsResult.Payload), `"truncated":true`) {
+		t.Fatalf("historical coverage overloaded item truncation: %s %v", itemsResult.Payload, err)
 	}
 	w.disconnected("auth_required")
 	if w.snapshot().Fresh || w.snapshot().Phase != "auth_required" {
@@ -268,16 +289,17 @@ func TestWorkerFailedHandleDoesNotCommitAndQueriesStayAvailableDuringSave(t *tes
 	}
 }
 
-func TestWorkerAcceptsDeliveredAuthorizedEventAfterCorruptCheckpoint(t *testing.T) {
+func TestWorkerAcceptsMembershipProvenEventAfterCorruptCheckpoint(t *testing.T) {
 	cfg, _ := decodeConfig([]byte(`{"app_id":"A123","workspace_id":"T123","user_id":"U123","channels":[{"id":"C123","alias":"PRIVATE"}]}`))
 	w := newWorker(protocol.Instance{ID: "slack", Generation: 1, Checkpoint: []byte(`{"schema_version":99}`)}, cfg, nil, nil, nil, time.Now)
 	defer w.cancel()
+	w.setMembershipProofLocked("C123", membershipProof{member: true, name: "PRIVATE", expires: time.Now().Add(membershipPositiveTTL)})
 	if w.snapshot().ErrorCode != "checkpoint_invalid" || !w.snapshot().Gap {
 		t.Fatal("restore mismatch silent")
 	}
 	w.reduce(callback("Ev1", `{"type":"message","channel":"C123","channel_type":"group","user":"U456","ts":"1.000001","text":"<@U123> private-canary"}`))
 	if len(w.snapshot().Items) != 1 || !w.snapshot().Gap || w.snapshot().ErrorCode != "checkpoint_invalid" {
-		t.Fatal("authorized event was rejected without a Web API scope preflight")
+		t.Fatal("membership-proven event was rejected after corrupt checkpoint")
 	}
 }
 

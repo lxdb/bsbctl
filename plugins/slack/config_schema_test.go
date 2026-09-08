@@ -111,7 +111,7 @@ func TestShippedSlackAppManifestIsMinimal(t *testing.T) {
   "settings": {
     "event_subscriptions": {
       "bot_events": ["app_uninstalled", "tokens_revoked"],
-      "user_events": ["message.channels", "message.groups", "message.im", "message.mpim"]
+      "user_events": ["message.channels", "message.groups", "message.im", "message.mpim", "member_joined_channel", "member_left_channel"]
     },
     "socket_mode_enabled": true,
     "token_rotation_enabled": false

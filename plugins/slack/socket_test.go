@@ -399,7 +399,7 @@ func TestSocketIdlePongRenewsLivenessWithoutClearingCoverageGap(t *testing.T) {
 	go func() { _, _, _ = peer.Read(ctx); close(remoteDone) }()
 	heartbeat <- time.Now()
 	renewed := waitSnapshot(t, w, func(s workerSnapshot) bool { return s.LastSuccess.After(initial.LastSuccess) })
-	if !renewed.Fresh || renewed.Phase != "degraded" || !renewed.Gap || renewed.Dropped != 1 {
+	if !renewed.Fresh || renewed.Phase != "ready" || !renewed.Gap || renewed.Dropped != 1 {
 		t.Fatalf("idle pong changed coverage state: %+v", renewed)
 	}
 	cancel()

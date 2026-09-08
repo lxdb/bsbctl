@@ -51,7 +51,7 @@ func (w *worker) observationKey(kind string) string {
 }
 func publicationSignature(s workerSnapshot) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "%s/%s/%t/%t/%t", s.Phase, s.ErrorCode, s.Fresh, s.Gap, s.Truncated)
+	fmt.Fprintf(&b, "%s/%s/%t/%t/%t/%t/%d", s.Phase, s.ErrorCode, s.Fresh, s.Gap, s.Truncated, s.Connected, s.NoticeUntil.UnixNano())
 	for _, a := range s.Items {
 		fmt.Fprintf(&b, "/%s:%d:%t", a.ID, a.Revision, a.Handled)
 	}
@@ -110,6 +110,9 @@ func (w *worker) publishResident(ctx context.Context) error {
 		if channel == ChannelAttention {
 			expires = minTime(expires, s.FreshUntil)
 		}
+		if channel == ChannelConnection && s.Phase == "ready" {
+			expires = minTime(expires, s.NoticeUntil)
+		}
 		desired[channel+"/"+key] = publishedItem{observation: protocol.Observation{Instance: w.instance.Ref(), Channel: channel, Key: key, Disposition: disposition, Impact: impact, ReasonCode: reason, ObservedAt: observed, UpdatedAt: now, ValidUntil: expires, Scene: new(scene)}, target: target, fresh: channel == ChannelAttention, residentSignature: signature}
 	}
 	if s.Fresh {
@@ -122,7 +125,7 @@ func (w *worker) publishResident(ctx context.Context) error {
 			add(ChannelAttention, a.ID, a.Kind, protocol.ImpactNotable, detailScene(w.cfg, s, a, 0, now), a)
 		}
 	}
-	if w.cfg.configured && (s.Phase != "ready" || s.Gap || s.Truncated || len(attentionItems(s.Items)) > 32) {
+	if w.cfg.configured && (s.Phase != "ready" || now.Before(s.NoticeUntil)) {
 		add(ChannelConnection, w.observationKey("connection"), "coverage", protocol.ImpactNotable, connectionScene(s), activity{})
 	}
 	// Remove obsolete slots before admitting new cards; even failed withdrawals

@@ -235,12 +235,14 @@ func (h *Handler) InvokeOperation(ctx context.Context, request protocol.Operatio
 			return protocol.OperationResult{}, protocol.NewDomainError(protocol.ErrorInvalidArgument, errConfig)
 		}
 		result = struct {
-			Phase       string    `json:"phase"`
-			LastSuccess time.Time `json:"last_success_at,omitzero"`
-			ErrorCode   string    `json:"last_error_code"`
-			Pending     int       `json:"pending_count"`
-			Truncated   bool      `json:"truncated"`
-		}{snap.Phase, snap.LastSuccess, snap.ErrorCode, len(snap.Items), snap.Truncated || snap.Gap}
+			Phase              string    `json:"phase"`
+			LastSuccess        time.Time `json:"last_success_at,omitzero"`
+			ErrorCode          string    `json:"last_error_code"`
+			Pending            int       `json:"pending_count"`
+			Connected          bool      `json:"connected"`
+			CoverageIncomplete bool      `json:"coverage_incomplete"`
+			Truncated          bool      `json:"truncated"`
+		}{snap.Phase, snap.LastSuccess, snap.ErrorCode, len(snap.Items), snap.Connected, snap.CoverageIncomplete, snap.Truncated}
 	case "items":
 		var input struct {
 			Limit *int `json:"limit"`
@@ -279,7 +281,7 @@ func (h *Handler) InvokeOperation(ctx context.Context, request protocol.Operatio
 		result = struct {
 			Items     []item `json:"items"`
 			Truncated bool   `json:"truncated"`
-		}{items, snap.Truncated || snap.Gap || len(snap.Items) > limit}
+		}{items, snap.Truncated || len(snap.Items) > limit}
 	default:
 		return protocol.OperationResult{}, protocol.NewDomainError(protocol.ErrorInvalidArgument, errConfig)
 	}

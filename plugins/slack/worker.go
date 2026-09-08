@@ -12,10 +12,24 @@ import (
 )
 
 const (
-	channelNameRetry   = time.Minute
-	channelNameRefresh = time.Hour
-	channelNameQueue   = 128
+	membershipRetryDelay  = time.Second
+	membershipPositiveTTL = 5 * time.Minute
+	membershipNegativeTTL = time.Minute
+	membershipQueueSize   = 128
+	maxPendingMembership  = 128
+	coverageNoticeTTL     = 15 * time.Second
 )
+
+type membershipProof struct {
+	member  bool
+	name    string
+	expires time.Time
+}
+
+type membershipRequest struct {
+	channelID string
+	epoch     uint64
+}
 
 type domainSnapshot struct {
 	Items     []activity
@@ -24,65 +38,95 @@ type domainSnapshot struct {
 
 // workerSnapshot is a value copy. FreshUntil is a source deadline, never a render deadline.
 type workerSnapshot struct {
-	Items       []activity
-	Phase       string
-	LastSuccess time.Time
-	ErrorCode   string
-	FreshUntil  time.Time
-	Fresh       bool
-	Gap         bool
-	Dropped     uint64
-	Truncated   bool
-	OpenUnsaved bool
+	Items              []activity
+	Phase              string
+	LastSuccess        time.Time
+	ErrorCode          string
+	FreshUntil         time.Time
+	Fresh              bool
+	Gap                bool
+	Connected          bool
+	CoverageIncomplete bool
+	NoticeUntil        time.Time
+	Dropped            uint64
+	Truncated          bool
+	OpenUnsaved        bool
 }
 
 type worker struct {
-	instance  protocol.Instance
-	cfg       config
-	host      Host
-	client    *slackClient
-	dial      socketDialer
-	now       func() time.Time
-	ctx       context.Context
-	cancel    context.CancelFunc
-	done      chan struct{}
-	queue     chan json.RawMessage
-	nameQueue chan string
-	changed   chan struct{}
+	instance        protocol.Instance
+	cfg             config
+	host            Host
+	client          *slackClient
+	dial            socketDialer
+	now             func() time.Time
+	ctx             context.Context
+	cancel          context.CancelFunc
+	done            chan struct{}
+	queue           chan json.RawMessage
+	membershipQueue chan membershipRequest
+	changed         chan struct{}
 
 	diagnostics [len(diagnosticCodes)]atomic.Uint64
 
 	// mu serializes reduction and durable handling; host calls must use w.ctx.
 	// The socket reader never acquires it. Snapshots use an immutable cached view.
-	mu               sync.Mutex
-	state            *state
-	nameRetry        map[string]time.Time
-	dirty            bool
-	domain           atomic.Pointer[domainSnapshot]
-	transportMu      sync.Mutex
-	activeConnection uint64
-	authRequired     bool
-	connected        bool
-	lastSuccess      time.Time
-	freshUntil       time.Time
-	sourceCode       string
-	gap              bool
-	dropped          uint64
-	checkpointFailed bool
-	openUnsaved      bool
-	restoreFailed    bool
-	publications     publisher
-	panelMu          sync.Mutex
-	panel            *panelSession
+	mu                     sync.Mutex
+	state                  *state
+	membershipProofs       map[string]membershipProof
+	membershipRetry        map[string]time.Time
+	membershipInFlight     map[string]uint64
+	membershipEpoch        map[string]uint64
+	nextMembershipEpoch    uint64
+	membershipPending      map[string][]normalizedEvent
+	membershipPendingIDs   map[string]bool
+	membershipPendingCount int
+	membershipFailures     map[string]string
+	dirty                  bool
+	domain                 atomic.Pointer[domainSnapshot]
+	transportMu            sync.Mutex
+	activeConnection       uint64
+	authRequired           bool
+	connected              bool
+	lastSuccess            time.Time
+	freshUntil             time.Time
+	sourceCode             string
+	membershipCode         string
+	membershipAuthRequired bool
+	gap                    bool
+	gapIncident            bool
+	gapNoticeUntil         time.Time
+	dropped                uint64
+	checkpointFailed       bool
+	openUnsaved            bool
+	restoreFailed          bool
+	publications           publisher
+	panelMu                sync.Mutex
+	panel                  *panelSession
 }
 
 func newWorker(instance protocol.Instance, cfg config, host Host, client *slackClient, dial socketDialer, now func() time.Time) *worker {
 	ctx, cancel := context.WithCancel(context.Background())
-	w := &worker{instance: instance, cfg: cfg, host: host, client: client, dial: dial, now: now, ctx: ctx, cancel: cancel, done: make(chan struct{}), queue: make(chan json.RawMessage, 256), nameQueue: make(chan string, channelNameQueue), changed: make(chan struct{}, 1), state: newState(cfg, cfg.userID), nameRetry: make(map[string]time.Time)}
+	w := &worker{
+		instance: instance, cfg: cfg, host: host, client: client, dial: dial, now: now,
+		ctx: ctx, cancel: cancel, done: make(chan struct{}), queue: make(chan json.RawMessage, 256),
+		membershipQueue: make(chan membershipRequest, membershipQueueSize), changed: make(chan struct{}, 1),
+		state: newState(cfg, cfg.userID), membershipProofs: make(map[string]membershipProof),
+		membershipRetry: make(map[string]time.Time), membershipInFlight: make(map[string]uint64),
+		membershipEpoch: make(map[string]uint64), membershipPending: make(map[string][]normalizedEvent),
+		membershipPendingIDs: make(map[string]bool), membershipFailures: make(map[string]string),
+	}
 	if err := w.state.restoreCheckpoint(instance.Checkpoint, now()); err != nil {
 		w.recordDiagnostic("checkpoint_invalid")
 		w.restoreFailed = true
 		w.gap = true
+	} else {
+		if w.state.unresolvedMembership {
+			w.state.unresolvedMembership = false
+			w.state.coverageIncomplete = true
+			w.dirty = true
+		}
+		w.gap = w.state.coverageIncomplete
 	}
 	w.publications.current = make(map[string]publishedItem)
 	w.cacheLocked()
@@ -107,12 +151,15 @@ func (w *worker) snapshot() workerSnapshot {
 	w.transportMu.Lock()
 	result.OpenUnsaved = w.openUnsaved
 	result.LastSuccess, result.FreshUntil, result.ErrorCode, result.Gap, result.Dropped = w.lastSuccess, w.freshUntil, w.sourceCode, w.gap, w.dropped
-	result.Fresh = w.freshUntil.After(now) && w.sourceCode != "auth_required" && w.ctx.Err() == nil
+	result.Connected, result.NoticeUntil = w.connected, w.gapNoticeUntil
+	result.CoverageIncomplete = w.gap || result.Truncated
+	result.Fresh = w.freshUntil.After(now) && w.sourceCode != "auth_required" && !w.membershipAuthRequired && w.ctx.Err() == nil
 	switch {
 	case !w.cfg.configured:
 		result.Phase = "unconfigured"
-	case w.sourceCode == "auth_required":
+	case w.sourceCode == "auth_required" || w.membershipAuthRequired:
 		result.Phase = "auth_required"
+		result.ErrorCode = "auth_required"
 	case w.checkpointFailed:
 		result.Phase = "degraded"
 		result.ErrorCode = "checkpoint_failed"
@@ -121,7 +168,10 @@ func (w *worker) snapshot() workerSnapshot {
 		if result.ErrorCode == "" {
 			result.ErrorCode = "checkpoint_invalid"
 		}
-	case w.gap || !w.connected && !w.lastSuccess.IsZero():
+	case w.membershipCode != "":
+		result.Phase = "degraded"
+		result.ErrorCode = w.membershipCode
+	case !w.connected && !w.lastSuccess.IsZero():
 		result.Phase = "degraded"
 	case result.Fresh:
 		result.Phase = "ready"
@@ -149,7 +199,7 @@ func (w *worker) markGap(code string, drop bool) {
 // Terminating read failures update health here; runTransport reports them once.
 func (w *worker) setGap(code string, drop bool) {
 	w.transportMu.Lock()
-	w.gap = true
+	w.recordGapLocked()
 	if !w.authRequired {
 		w.sourceCode = code
 	}
@@ -187,6 +237,15 @@ func (w *worker) liveLocked() {
 	w.lastSuccess = w.now().UTC()
 	w.freshUntil = w.lastSuccess.Add(30 * time.Second)
 	w.sourceCode = ""
+	w.gapIncident = false
+}
+
+func (w *worker) recordGapLocked() {
+	w.gap = true
+	if !w.gapIncident {
+		w.gapIncident = true
+		w.gapNoticeUntil = w.now().UTC().Add(coverageNoticeTTL)
+	}
 }
 
 func (w *worker) connectionGap(id uint64, code string, drop, diagnostic bool) {
@@ -195,7 +254,7 @@ func (w *worker) connectionGap(id uint64, code string, drop, diagnostic bool) {
 		w.transportMu.Unlock()
 		return
 	}
-	w.gap = true
+	w.recordGapLocked()
 	if !w.authRequired {
 		w.sourceCode = code
 	}
@@ -231,7 +290,7 @@ func (w *worker) disconnected(code string) {
 
 func (w *worker) disconnectedLocked(code string) {
 	w.connected = false
-	w.gap = true
+	w.recordGapLocked()
 	w.activeConnection = 0
 	w.authRequired = w.authRequired || code == "auth_required"
 	if w.authRequired {
@@ -261,7 +320,7 @@ func (w *worker) run() {
 	var background sync.WaitGroup
 	background.Go(w.runPublisher)
 	background.Go(w.runDiagnostics)
-	background.Go(w.runChannelNameResolver)
+	background.Go(w.runMembershipResolver)
 	defer background.Wait()
 	if !w.cfg.configured {
 		<-w.ctx.Done()
@@ -283,6 +342,7 @@ func (w *worker) run() {
 			w.reduce(raw)
 		case <-ticker.C:
 			w.mu.Lock()
+			w.queueMembershipRetriesLocked()
 			if w.state.prune(w.now()) {
 				w.dirty = true
 				w.cacheLocked()
@@ -301,89 +361,291 @@ func (w *worker) reduce(raw json.RawMessage) {
 	if w.ctx.Err() != nil || w.requiresAuthentication() {
 		return
 	}
-	var callback struct {
-		Type   string `json:"type"`
-		TeamID string `json:"team_id"`
-		Event  struct {
-			Type        string `json:"type"`
-			Channel     string `json:"channel"`
-			ChannelType string `json:"channel_type"`
-		} `json:"event"`
-	}
-	if json.Unmarshal(raw, &callback) != nil {
-		w.markGap("invalid_event", false)
+	callback, err := normalizeCallbackEvent(raw, w.cfg.appID, w.cfg.workspaceID, w.cfg.userID, w.cfg.rearDetails || w.cfg.frontMessagePreview)
+	if err != nil {
+		w.handleReductionErrorLocked(err)
 		return
 	}
-	if callback.Type == "app_rate_limited" && callback.TeamID == w.cfg.workspaceID {
+	switch callback.kind {
+	case callbackIgnored:
+		return
+	case callbackMembership:
+		w.applyMembershipLifecycleLocked(callback.membership)
+		return
+	case callbackRateLimited:
 		w.markGap("throttled", false)
 		return
 	}
-	changed, err := w.state.apply(raw, w.now())
-	if err != nil {
-		code := "invalid_event"
-		if errors.Is(err, errUnsupportedEvent) {
-			code = "unsupported_event"
-		}
-		if errors.Is(err, errAuthorization) {
-			code = "unproven_authorization"
-		}
-		w.markGap(code, false)
+	event := callback.message
+	_, selected := w.cfg.channels[event.channelID]
+	if (event.channelType == "channel" || event.channelType == "group") && (w.cfg.allChannels || selected) {
+		w.admitByMembershipLocked(event)
+		return
 	}
+	w.applyNormalizedLocked(event)
+}
+
+func (w *worker) handleReductionErrorLocked(err error) {
+	code := "invalid_event"
+	if errors.Is(err, errUnsupportedEvent) {
+		code = "unsupported_event"
+	}
+	if errors.Is(err, errAuthorization) {
+		code = "unproven_authorization"
+	}
+	w.markGap(code, false)
+}
+
+func (w *worker) applyNormalizedLocked(event normalizedEvent) {
+	changed := w.state.applyNormalized(event, w.now())
 	if changed {
 		w.dirty = true
 		w.cacheLocked()
-		w.queueChannelNameLocked(callback.Event.Channel, callback.Event.ChannelType)
 	}
 }
 
-func (w *worker) queueChannelNameLocked(channelID, channelType string) {
-	for id := range w.nameRetry {
-		if !w.state.hasChannel(id) {
-			delete(w.nameRetry, id)
+func (w *worker) admitByMembershipLocked(event normalizedEvent) {
+	channelID := event.channelID
+	now := w.now()
+	if proof, ok := w.membershipProofs[channelID]; ok && now.Before(proof.expires) {
+		if proof.member {
+			w.applyNormalizedLocked(event)
+			if proof.name != "" && w.state.setChannelName(channelID, proof.name) {
+				w.cacheLocked()
+			}
 		}
-	}
-	if !w.cfg.allChannels || w.cfg.channels[channelID] != "" || channelType != "channel" && channelType != "group" || w.now().Before(w.nameRetry[channelID]) {
 		return
 	}
+	delete(w.membershipProofs, channelID)
+	if w.membershipPendingIDs[event.callbackID] || w.state.hasAcceptedCallback(event.callbackID) {
+		return
+	}
+	if w.membershipPendingCount == maxPendingMembership {
+		w.markGap("queue_overflow", true)
+		return
+	}
+	w.membershipPending[channelID] = append(w.membershipPending[channelID], event)
+	w.membershipPendingIDs[event.callbackID] = true
+	w.membershipPendingCount++
+	if !w.state.unresolvedMembership {
+		w.state.unresolvedMembership = true
+		w.dirty = true
+		if w.host != nil {
+			_ = w.saveLocked(w.ctx)
+		}
+	}
+	w.queueMembershipLookupLocked(channelID)
+}
+
+func (w *worker) queueMembershipLookupLocked(channelID string) {
+	w.transportMu.Lock()
+	authRequired := w.membershipAuthRequired
+	w.transportMu.Unlock()
+	if authRequired {
+		return
+	}
+	if _, active := w.membershipInFlight[channelID]; active || w.now().Before(w.membershipRetry[channelID]) {
+		return
+	}
+	epoch := w.membershipEpochLocked(channelID)
 	select {
-	case w.nameQueue <- channelID:
-		w.nameRetry[channelID] = w.now().Add(channelNameRetry)
+	case w.membershipQueue <- membershipRequest{channelID: channelID, epoch: epoch}:
+		w.membershipInFlight[channelID] = epoch
 	default:
+		w.membershipRetry[channelID] = w.now().Add(membershipRetryDelay)
 	}
 }
 
-func (w *worker) runChannelNameResolver() {
+func (w *worker) queueMembershipRetriesLocked() {
+	for channelID := range w.membershipPending {
+		w.queueMembershipLookupLocked(channelID)
+	}
+}
+
+func (w *worker) membershipEpochLocked(channelID string) uint64 {
+	if epoch := w.membershipEpoch[channelID]; epoch != 0 {
+		return epoch
+	}
+	w.nextMembershipEpoch++
+	if w.nextMembershipEpoch == 0 {
+		w.nextMembershipEpoch++
+	}
+	w.membershipEpoch[channelID] = w.nextMembershipEpoch
+	return w.nextMembershipEpoch
+}
+
+func (w *worker) advanceMembershipEpochLocked(channelID string) {
+	delete(w.membershipEpoch, channelID)
+	w.membershipEpochLocked(channelID)
+}
+
+func (w *worker) runMembershipResolver() {
 	for {
 		select {
 		case <-w.ctx.Done():
 			return
-		case channelID := <-w.nameQueue:
-			name, err := w.client.conversationName(w.ctx, w.instance.Secrets["user_token"], channelID)
-			if w.ctx.Err() != nil {
-				return
-			}
-			w.mu.Lock()
-			if !w.state.hasChannel(channelID) {
-				delete(w.nameRetry, channelID)
-				w.mu.Unlock()
-				continue
-			}
-			if err != nil {
-				if source, ok := errors.AsType[*sourceError](err); ok {
-					w.recordDiagnostic(source.code)
-					w.nameRetry[channelID] = w.now().Add(max(channelNameRetry, source.retryAfter))
-				} else {
-					w.recordDiagnostic("request_failed")
-				}
-			} else {
-				w.nameRetry[channelID] = w.now().Add(channelNameRefresh)
-				if w.state.setChannelName(channelID, name) {
-					w.cacheLocked()
-				}
-			}
-			w.mu.Unlock()
+		case request := <-w.membershipQueue:
+			w.resolveMembership(request)
 		}
 	}
+}
+
+func (w *worker) resolveMembership(request membershipRequest) {
+	w.transportMu.Lock()
+	authRequired := w.membershipAuthRequired
+	w.transportMu.Unlock()
+	if authRequired {
+		w.mu.Lock()
+		if w.membershipInFlight[request.channelID] == request.epoch {
+			delete(w.membershipInFlight, request.channelID)
+		}
+		w.mu.Unlock()
+		return
+	}
+	name, err := w.client.conversationName(w.ctx, w.instance.Secrets["user_token"], request.channelID)
+	if w.ctx.Err() != nil {
+		return
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.membershipInFlight[request.channelID] == request.epoch {
+		delete(w.membershipInFlight, request.channelID)
+	}
+	if request.epoch != w.membershipEpoch[request.channelID] {
+		if len(w.membershipPending[request.channelID]) != 0 {
+			w.queueMembershipLookupLocked(request.channelID)
+		}
+		return
+	}
+	switch {
+	case errors.Is(err, errNotMember):
+		w.setMembershipProofLocked(request.channelID, membershipProof{expires: w.now().Add(membershipNegativeTTL)})
+		delete(w.membershipRetry, request.channelID)
+		w.discardPendingMembershipLocked(request.channelID)
+		changed := w.state.removeChannel(request.channelID, w.now())
+		w.clearMembershipFailureLocked(request.channelID)
+		if changed {
+			w.dirty = true
+			w.cacheLocked()
+		}
+		w.settlePendingMembershipLocked()
+	case err != nil:
+		code := "request_failed"
+		retry := membershipRetryDelay
+		if source, ok := errors.AsType[*sourceError](err); ok {
+			code = source.code
+			retry = max(retry, source.retryAfter)
+		}
+		w.recordDiagnostic(code)
+		if code == "auth_required" {
+			delete(w.membershipRetry, request.channelID)
+			w.membershipFailures[request.channelID] = code
+			w.transportMu.Lock()
+			w.membershipAuthRequired = true
+			w.membershipCode = code
+			w.transportMu.Unlock()
+			w.notify()
+			return
+		}
+		w.membershipRetry[request.channelID] = w.now().Add(retry)
+		w.membershipFailures[request.channelID] = code
+		w.updateMembershipCodeLocked()
+	case err == nil:
+		w.setMembershipProofLocked(request.channelID, membershipProof{member: true, name: name, expires: w.now().Add(membershipPositiveTTL)})
+		delete(w.membershipRetry, request.channelID)
+		w.clearMembershipFailureLocked(request.channelID)
+		pending := w.membershipPending[request.channelID]
+		w.discardPendingMembershipLocked(request.channelID)
+		for _, event := range pending {
+			w.applyNormalizedLocked(event)
+		}
+		if w.state.setChannelName(request.channelID, name) {
+			w.cacheLocked()
+		}
+		w.settlePendingMembershipLocked()
+	}
+}
+
+func (w *worker) discardPendingMembershipLocked(channelID string) {
+	for _, event := range w.membershipPending[channelID] {
+		delete(w.membershipPendingIDs, event.callbackID)
+		w.membershipPendingCount--
+	}
+	delete(w.membershipPending, channelID)
+}
+
+func (w *worker) settlePendingMembershipLocked() {
+	if w.membershipPendingCount != 0 || !w.state.unresolvedMembership {
+		return
+	}
+	w.state.unresolvedMembership = false
+	w.dirty = true
+	if w.host != nil {
+		_ = w.saveLocked(w.ctx)
+	}
+}
+
+func (w *worker) setMembershipProofLocked(channelID string, proof membershipProof) {
+	w.membershipProofs[channelID] = proof
+	for len(w.membershipProofs) > maxRetained {
+		oldest := ""
+		for id, candidate := range w.membershipProofs {
+			if oldest == "" || candidate.expires.Before(w.membershipProofs[oldest].expires) || candidate.expires.Equal(w.membershipProofs[oldest].expires) && id < oldest {
+				oldest = id
+			}
+		}
+		delete(w.membershipProofs, oldest)
+		if len(w.membershipPending[oldest]) == 0 {
+			if _, inFlight := w.membershipInFlight[oldest]; !inFlight {
+				delete(w.membershipEpoch, oldest)
+			}
+		}
+	}
+}
+
+func (w *worker) clearMembershipFailureLocked(channelID string) {
+	delete(w.membershipFailures, channelID)
+	w.updateMembershipCodeLocked()
+}
+
+func (w *worker) updateMembershipCodeLocked() {
+	code := ""
+	for _, failure := range w.membershipFailures {
+		if code == "" || failure < code {
+			code = failure
+		}
+	}
+	w.transportMu.Lock()
+	w.membershipCode = code
+	w.transportMu.Unlock()
+	w.notify()
+}
+
+func (w *worker) applyMembershipLifecycleLocked(event membershipEvent) {
+	if !w.state.acceptCallback(event.callbackID) || event.userID != w.cfg.userID {
+		return
+	}
+	w.advanceMembershipEpochLocked(event.channelID)
+	delete(w.membershipInFlight, event.channelID)
+	delete(w.membershipRetry, event.channelID)
+	w.clearMembershipFailureLocked(event.channelID)
+	if event.kind == "member_left_channel" {
+		w.setMembershipProofLocked(event.channelID, membershipProof{expires: w.now().Add(membershipNegativeTTL)})
+		w.discardPendingMembershipLocked(event.channelID)
+		if w.state.removeChannel(event.channelID, w.now()) {
+			w.dirty = true
+			w.cacheLocked()
+		}
+		w.settlePendingMembershipLocked()
+		return
+	}
+	w.setMembershipProofLocked(event.channelID, membershipProof{member: true, expires: w.now().Add(membershipPositiveTTL)})
+	pending := w.membershipPending[event.channelID]
+	w.discardPendingMembershipLocked(event.channelID)
+	for _, pendingEvent := range pending {
+		w.applyNormalizedLocked(pendingEvent)
+	}
+	w.settlePendingMembershipLocked()
 }
 
 func (w *worker) saveLocked(ctx context.Context) error {

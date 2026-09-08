@@ -64,37 +64,90 @@ type normalizedEvent struct {
 	preview     string
 }
 
-func normalizeEvent(raw json.RawMessage, appID, workspaceID, userID string, rearDetails bool) (normalizedEvent, bool, error) {
+type membershipEvent struct {
+	callbackID string
+	kind       string
+	channelID  string
+	userID     string
+}
+
+type normalizedCallbackKind uint8
+
+const (
+	callbackIgnored normalizedCallbackKind = iota
+	callbackMessage
+	callbackMembership
+	callbackRateLimited
+)
+
+type normalizedCallback struct {
+	kind       normalizedCallbackKind
+	message    normalizedEvent
+	membership membershipEvent
+}
+
+func validateCallbackEnvelope(callback eventCallback, appID, workspaceID, userID string) error {
+	if callback.Type != "event_callback" {
+		return errUnsupportedEvent
+	}
+	if callback.APIAppID != appID || callback.TeamID != workspaceID {
+		return errAuthorization
+	}
+	for _, auth := range callback.Authorizations {
+		if auth.TeamID == workspaceID && auth.UserID == userID && auth.IsBot != nil && !*auth.IsBot {
+			if len(callback.EventID) == 0 || len(callback.EventID) > 128 {
+				return errEvent
+			}
+			return nil
+		}
+	}
+	return errAuthorization
+}
+
+func normalizeCallbackEvent(raw json.RawMessage, appID, workspaceID, userID string, rearDetails bool) (normalizedCallback, error) {
 	if len(raw) == 0 || len(raw) > maxEventBytes {
-		return normalizedEvent{}, false, errEvent
+		return normalizedCallback{}, errEvent
 	}
 	var callback eventCallback
 	if err := json.Unmarshal(raw, &callback); err != nil {
-		return normalizedEvent{}, false, errEvent
+		return normalizedCallback{}, errEvent
 	}
-	if callback.Type != "event_callback" {
-		return normalizedEvent{}, false, errUnsupportedEvent
-	}
-	if callback.APIAppID != appID || callback.TeamID != workspaceID {
-		return normalizedEvent{}, false, errAuthorization
-	}
-	authorized := false
-	for _, auth := range callback.Authorizations {
-		if auth.TeamID == workspaceID && auth.UserID == userID && auth.IsBot != nil && !*auth.IsBot {
-			authorized = true
-			break
+	if callback.Type == "app_rate_limited" {
+		if callback.TeamID == workspaceID {
+			return normalizedCallback{kind: callbackRateLimited}, nil
 		}
+		return normalizedCallback{}, errUnsupportedEvent
 	}
-	if !authorized {
-		return normalizedEvent{}, false, errAuthorization
+	if err := validateCallbackEnvelope(callback, appID, workspaceID, userID); err != nil {
+		return normalizedCallback{}, err
 	}
-	if len(callback.EventID) == 0 || len(callback.EventID) > 128 {
-		return normalizedEvent{}, false, errEvent
+	switch callback.Event.Type {
+	case "member_joined_channel", "member_left_channel":
+		if !validID(callback.Event.Channel, "CG") || !validID(callback.Event.User, "UW") {
+			return normalizedCallback{}, errEvent
+		}
+		return normalizedCallback{
+			kind: callbackMembership,
+			membership: membershipEvent{
+				callbackID: hashParts(workspaceID, callback.EventID),
+				kind:       callback.Event.Type,
+				channelID:  callback.Event.Channel,
+				userID:     callback.Event.User,
+			},
+		}, nil
+	case "message":
+		event, ok, err := normalizeMessage(callback, workspaceID, userID, rearDetails)
+		if err != nil || !ok {
+			return normalizedCallback{}, err
+		}
+		return normalizedCallback{kind: callbackMessage, message: event}, nil
+	default:
+		return normalizedCallback{}, errUnsupportedEvent
 	}
+}
+
+func normalizeMessage(callback eventCallback, workspaceID, userID string, rearDetails bool) (normalizedEvent, bool, error) {
 	msg := callback.Event
-	if msg.Type != "message" {
-		return normalizedEvent{}, false, errUnsupportedEvent
-	}
 	event := normalizedEvent{callbackID: hashParts(workspaceID, callback.EventID), channelID: msg.Channel, channelType: msg.ChannelType}
 	if !validID(event.channelID, "CDG") {
 		return normalizedEvent{}, false, errEvent

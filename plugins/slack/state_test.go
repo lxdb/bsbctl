@@ -24,11 +24,25 @@ func callback(eventID, event string) json.RawMessage {
 }
 func applyFixture(t *testing.T, s *state, id, event string, at time.Time) bool {
 	t.Helper()
-	changed, err := s.apply(callback(id, event), at)
+	changed, err := applyRawFixture(s, callback(id, event), at)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return changed
+}
+
+func applyRawFixture(s *state, raw json.RawMessage, at time.Time) (bool, error) {
+	callback, err := normalizeCallbackEvent(raw, s.config.appID, s.config.workspaceID, s.userID, s.config.rearDetails || s.config.frontMessagePreview)
+	if err != nil {
+		return false, err
+	}
+	if callback.kind == callbackIgnored {
+		return false, nil
+	}
+	if callback.kind != callbackMessage {
+		return false, errUnsupportedEvent
+	}
+	return s.applyNormalized(callback.message, at), nil
 }
 
 func TestStateHumanMentionsAndAuthorizedDomains(t *testing.T) {
@@ -119,7 +133,7 @@ func TestStateResolvedChannelNameReplacesOnlyFallbackAlias(t *testing.T) {
 
 func TestStateAppMentionReportsUnsupportedWithoutAttention(t *testing.T) {
 	s := fixtureState(t, "")
-	changed, err := s.apply(callback("Ev1", `{"type":"app_mention","channel":"C123","user":"U456","ts":"1.000001","text":"<@U123>"}`), fixtureNow)
+	changed, err := applyRawFixture(s, callback("Ev1", `{"type":"app_mention","channel":"C123","user":"U456","ts":"1.000001","text":"<@U123>"}`), fixtureNow)
 	if !errors.Is(err, errUnsupportedEvent) || changed || len(s.items()) != 0 {
 		t.Fatalf("app mention created attention or lost diagnostic classification: changed=%t err=%v items=%v", changed, err, s.items())
 	}
@@ -129,7 +143,7 @@ func TestStateRejectsUnprovenAuthorizationWithoutLeakingBodies(t *testing.T) {
 	for _, auth := range []string{``, `,"authorizations":[]`, `,"authorizations":[{"team_id":"T123","user_id":"U999","is_bot":false}]`, `,"authorizations":[{"team_id":"T123","user_id":"U123","is_bot":true}]`, `,"authorizations":[{"team_id":"T999","user_id":"U123","is_bot":false}]`} {
 		s := fixtureState(t, "")
 		raw := json.RawMessage(`{"type":"event_callback","api_app_id":"A123","team_id":"T123","event_id":"Ev1"` + auth + `,"event":{"type":"message","channel":"D123","channel_type":"im","user":"U456","ts":"1.000001","text":"canary-body"}}`)
-		if _, err := s.apply(raw, fixtureNow); err == nil || err.Error() != "unproven Slack event authorization" {
+		if _, err := applyRawFixture(s, raw, fixtureNow); err == nil || err.Error() != "unproven Slack event authorization" {
 			t.Fatalf("scope error: %v", err)
 		}
 		if len(s.items()) != 0 {
@@ -138,7 +152,7 @@ func TestStateRejectsUnprovenAuthorizationWithoutLeakingBodies(t *testing.T) {
 	}
 	s := fixtureState(t, "")
 	wrongApp := json.RawMessage(`{"type":"event_callback","api_app_id":"A999","team_id":"T123","event_id":"Ev1","authorizations":[{"team_id":"T123","user_id":"U123","is_bot":false}],"event":{"type":"message","channel":"D123","channel_type":"im","user":"U456","ts":"1.000001","text":"canary-body"}}`)
-	if _, err := s.apply(wrongApp, fixtureNow); !errors.Is(err, errAuthorization) || len(s.items()) != 0 {
+	if _, err := applyRawFixture(s, wrongApp, fixtureNow); !errors.Is(err, errAuthorization) || len(s.items()) != 0 {
 		t.Fatalf("wrong Slack app admitted: %v", err)
 	}
 }

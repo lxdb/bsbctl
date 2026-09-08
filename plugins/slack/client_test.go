@@ -78,7 +78,7 @@ func TestClientResolvesFullChannelNameWithUserToken(t *testing.T) {
 		if err := r.ParseForm(); err != nil || r.Form.Get("channel") != "C123" {
 			t.Fatalf("channel form = %v, %v", r.Form, err)
 		}
-		_, _ = io.WriteString(w, `{"ok":true,"channel":{"id":"C123","name":"engineering-platform"}}`)
+		_, _ = io.WriteString(w, `{"ok":true,"channel":{"id":"C123","name":"engineering-platform","is_member":true}}`)
 	})
 	name, err := client.conversationName(t.Context(), "user-canary", "C123")
 	if err != nil || name != "engineering-platform" {
@@ -88,9 +88,10 @@ func TestClientResolvesFullChannelNameWithUserToken(t *testing.T) {
 
 func TestClientRejectsUnsafeOrUnauthorizedChannelMetadata(t *testing.T) {
 	for name, response := range map[string]string{
-		"missing scope": `{"ok":false,"error":"missing_scope"}`,
-		"wrong channel": `{"ok":true,"channel":{"id":"C999","name":"private-canary"}}`,
-		"blank name":    `{"ok":true,"channel":{"id":"C123","name":""}}`,
+		"missing scope":      `{"ok":false,"error":"missing_scope"}`,
+		"wrong channel":      `{"ok":true,"channel":{"id":"C999","name":"private-canary","is_member":true}}`,
+		"blank name":         `{"ok":true,"channel":{"id":"C123","name":"","is_member":true}}`,
+		"missing membership": `{"ok":true,"channel":{"id":"C123","name":"engineering-platform"}}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			client := fixtureClient(t, func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, response) })
@@ -99,5 +100,15 @@ func TestClientRejectsUnsafeOrUnauthorizedChannelMetadata(t *testing.T) {
 				t.Fatalf("unsafe metadata = %q, %v", value, err)
 			}
 		})
+	}
+}
+
+func TestClientRejectsConversationWhereConfiguredUserIsNotMember(t *testing.T) {
+	client := fixtureClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = io.WriteString(w, `{"ok":true,"channel":{"id":"C123","name":"workspace-wide","is_member":false}}`)
+	})
+	value, err := client.conversationName(t.Context(), "user-canary", "C123")
+	if !errors.Is(err, errNotMember) || value != "" {
+		t.Fatalf("non-member metadata = %q, %v", value, err)
 	}
 }

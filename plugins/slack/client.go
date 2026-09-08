@@ -14,6 +14,8 @@ import (
 
 const requestTimeout = 10 * time.Second
 
+var errNotMember = errors.New("Slack user is not a conversation member")
+
 // sourceError intentionally never wraps provider text, credentials, or ticket URLs.
 type sourceError struct {
 	code       string
@@ -61,8 +63,9 @@ func (c *slackClient) conversationName(ctx context.Context, token, channelID str
 		OK      bool   `json:"ok"`
 		Error   string `json:"error"`
 		Channel struct {
-			ID   string `json:"id"`
-			Name string `json:"name"`
+			ID       string `json:"id"`
+			Name     string `json:"name"`
+			IsMember *bool  `json:"is_member"`
 		} `json:"channel"`
 	}
 	if _, err := c.callForm(ctx, "conversations.info", token, url.Values{"channel": {channelID}}, &response); err != nil {
@@ -71,7 +74,13 @@ func (c *slackClient) conversationName(ctx context.Context, token, channelID str
 	if !response.OK {
 		return "", providerError(response.Error)
 	}
-	if response.Channel.ID != channelID || !validLabel(response.Channel.Name) {
+	if response.Channel.ID != channelID || response.Channel.IsMember == nil {
+		return "", &sourceError{code: "invalid_response"}
+	}
+	if !*response.Channel.IsMember {
+		return "", errNotMember
+	}
+	if !validLabel(response.Channel.Name) {
 		return "", &sourceError{code: "invalid_response"}
 	}
 	return response.Channel.Name, nil

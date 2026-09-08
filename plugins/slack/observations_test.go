@@ -89,6 +89,33 @@ func TestPublisherExpiresWithoutSourceNotification(t *testing.T) {
 	})
 }
 
+func TestConnectedCoverageWarningExpiresAfterOneNotice(t *testing.T) {
+	_, w, host := panelFixture(t)
+	now := fixtureNow
+	w.now = func() time.Time { return now }
+	w.live()
+	w.markGap("queue_overflow", true)
+	if err := w.publishResident(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	var warning protocol.Observation
+	for _, observation := range host.observations {
+		if observation.Channel == ChannelConnection {
+			warning = observation
+		}
+	}
+	if warning.Revision == 0 || !warning.ValidUntil.Equal(fixtureNow.Add(coverageNoticeTTL)) {
+		t.Fatalf("coverage warning lease = %+v", warning)
+	}
+	now = now.Add(coverageNoticeTTL)
+	if err := w.publishResident(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if len(host.withdrawals) != 1 || w.snapshot().Phase != "ready" || !w.snapshot().CoverageIncomplete {
+		t.Fatalf("expired warning state: withdrawals=%d snapshot=%+v", len(host.withdrawals), w.snapshot())
+	}
+}
+
 func TestResidentPublicationIsQuietForAmbientChannelActivity(t *testing.T) {
 	_, w, host := panelFixture(t)
 	w.reduce(callback("EvChannel", `{"type":"message","channel":"C123","channel_type":"channel","user":"U456","ts":"2.000001","text":"ordinary channel update"}`))

@@ -8,7 +8,7 @@ import (
 
 func TestEventExtractionRejectsOversizeAndExcessiveRichTraversal(t *testing.T) {
 	for _, raw := range []json.RawMessage{json.RawMessage(strings.Repeat(" ", 262145)), json.RawMessage(`{"type":"event_callback"`)} {
-		if _, _, err := normalizeEvent(raw, "A123", "T123", "U123", false); err == nil {
+		if _, err := normalizeCallbackEvent(raw, "A123", "T123", "U123", false); err == nil {
 			t.Fatal("malformed or oversize event accepted")
 		}
 	}
@@ -17,7 +17,7 @@ func TestEventExtractionRejectsOversizeAndExcessiveRichTraversal(t *testing.T) {
 		node = `{"type":"rich_text_section","elements":[` + node + `]}`
 	}
 	msg := `{"type":"message","channel":"C123","channel_type":"channel","user":"U456","ts":"1.000001","blocks":[{"type":"rich_text","elements":[` + node + `]}]}`
-	if _, _, err := normalizeEvent(callback("EvDeep", msg), "A123", "T123", "U123", false); err == nil {
+	if _, err := normalizeCallbackEvent(callback("EvDeep", msg), "A123", "T123", "U123", false); err == nil {
 		t.Fatal("unbounded rich traversal")
 	}
 }

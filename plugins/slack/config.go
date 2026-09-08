@@ -137,10 +137,11 @@ func (c config) validateSecrets(secrets map[string]string) error {
 		return nil
 	}
 	want := 1
-	if c.allChannels {
+	needsMembership := c.allChannels || len(c.channels) != 0
+	if needsMembership {
 		want = 2
 	}
-	if len(secrets) != want || strings.TrimSpace(secrets["app_token"]) == "" || c.allChannels && strings.TrimSpace(secrets["user_token"]) == "" {
+	if len(secrets) != want || strings.TrimSpace(secrets["app_token"]) == "" || needsMembership && strings.TrimSpace(secrets["user_token"]) == "" {
 		return errSecrets
 	}
 	return nil

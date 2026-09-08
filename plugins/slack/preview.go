@@ -29,7 +29,8 @@ func PreviewScenes(now time.Time) []protocol.Scene {
 	}
 	for i, event := range events {
 		raw, _ := json.Marshal(map[string]any{"type": "event_callback", "api_app_id": "A123", "team_id": "T123", "event_id": []string{"preview-dm", "preview-mention"}[i], "authorizations": []any{map[string]any{"team_id": "T123", "user_id": "U123", "is_bot": false}}, "event": json.RawMessage(event)})
-		_, _ = state.apply(raw, now.Add(-time.Minute))
+		callback, _ := normalizeCallbackEvent(raw, cfg.appID, cfg.workspaceID, cfg.userID, true)
+		state.applyNormalized(callback.message, now.Add(-time.Minute))
 	}
 	snap.Items = state.items()
 	mention, direct := snap.Items[0], snap.Items[0]
@@ -55,7 +56,10 @@ func PreviewScenes(now time.Time) []protocol.Scene {
 	snap.Phase = "degraded"
 	scenes = append(scenes, connectionScene(snap))
 	snap.Fresh = true
+	snap.Phase = "ready"
 	snap.Gap = true
+	snap.Connected = true
+	snap.CoverageIncomplete = true
 	scenes = append(scenes, connectionScene(snap))
 	snap.Fresh = false
 	snap.Phase = "auth_required"
