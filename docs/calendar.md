@@ -23,7 +23,7 @@ Open Calendar from APPS for a read-only view. It shows the selected active event
 
 ## Event options and attendance
 
-While a reminder or active event is displayed, press START and rotate the encoder to choose:
+While a reminder or active event is displayed, press Play/Pause to open the options, then turn the knob to choose:
 
 | Choice | Effect |
 | --- | --- |
@@ -31,7 +31,7 @@ While a reminder or active event is displayed, press START and rotate the encode
 | `ATTEND` | Record attendance without opening a URL. |
 | `SKIP` | Hide this occurrence until it ends. |
 
-Press OK to confirm or BACK to cancel. Automatic event display does not record attendance. These choices are available from the event card, not the APPS launcher.
+Press Play/Pause to apply the displayed choice, or BACK to cancel. Pressing the knob has no effect. Automatic event display does not record attendance. These choices are available from the event card, not the APPS launcher.
 
 Calendar rechecks the event and meeting URL before applying a choice. If saving the choice fails, it reports degraded health and retries without opening the URL again.
 

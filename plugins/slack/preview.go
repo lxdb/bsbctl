@@ -44,13 +44,13 @@ func PreviewScenes(now time.Time) []protocol.Scene {
 		}
 	}
 	cfg.frontMessagePreview = false
-	scenes = append(scenes, detailScene(cfg, snap, mention, 0, now), detailScene(cfg, snap, direct, 0, now))
+	scenes = append(scenes, detailScene(cfg, snap, mention, panelOpen, now), detailScene(cfg, snap, direct, panelOpen, now))
 	cfg.frontMessagePreview = true
 	panel := &panelSession{level: panelDetail, target: direct}
 	scenes = append(scenes, panelScene(cfg, snap, panel, now))
 	cfg.frontMessagePreview = false
-	scenes = append(scenes, panelScene(cfg, snap, &panelSession{level: panelList}, now))
-	panel.level = panelDismiss
+	scenes = append(scenes, panelScene(cfg, snap, &panelSession{level: panelList, target: snap.Items[0]}, now))
+	panel.action = panelHandle
 	scenes = append(scenes, panelScene(cfg, snap, panel, now))
 	snap.Fresh = false
 	snap.Phase = "degraded"

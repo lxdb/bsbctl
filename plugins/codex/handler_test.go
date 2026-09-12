@@ -185,6 +185,13 @@ func TestHandlerUsesStartButtonAndExactSessionTokenForConfirmedApproval(t *testi
 	awaitHandlerObservation(t, host, func(value protocol.Observation) bool {
 		return value.Channel == ChannelDetail && value.Disposition != protocol.DispositionResolved
 	})
+	result, err := handler.HandleSessionInput(context.Background(), sessionInputRequest(t, "codex-main", "interactive-7", buttonInputEvent(inputpb.Button_OK)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Disposition != protocol.SessionInputNotConsumed {
+		t.Fatalf("OK result = %#v", result)
+	}
 	for count := 0; count < 2; count++ {
 		result, err := handler.HandleSessionInput(context.Background(), sessionInputRequest(t, "codex-main", "stale-token", buttonInputEvent(inputpb.Button_OK)))
 		if err != nil {
@@ -412,8 +419,13 @@ func TestHandlerSupportsRealCodexAskChoicesAndHandoff(t *testing.T) {
 			if got := cardElement(t, *detail.Scene, "back-option-label").Text.Value; got != wantLabel {
 				t.Fatalf("selected option = %q, want %q", got, wantLabel)
 			}
-			if _, err := handler.HandleSessionInput(t.Context(), sessionInputRequest(t, "codex-main", "ask-session", buttonInputEvent(inputpb.Button_OK))); err != nil {
+			if _, err := handler.HandleSessionInput(t.Context(), sessionInputRequest(t, "codex-main", "ask-session", buttonInputEvent(inputpb.Button_START))); err != nil {
 				t.Fatal(err)
+			}
+			if !handoff {
+				if _, err := handler.HandleSessionInput(t.Context(), sessionInputRequest(t, "codex-main", "ask-session", buttonInputEvent(inputpb.Button_START))); err != nil {
+					t.Fatal(err)
+				}
 			}
 			if completed := awaitHandlerCompletion(t, host); completed.SessionToken != "ask-session" {
 				t.Fatalf("wrong completed session: %#v", completed)

@@ -36,7 +36,7 @@ func TestPermissionInteractionReturnsExactRequestedProfileForTurnOrEmptyDecline(
 	}
 }
 
-func TestTypedQuestionInteractionSelectsAndSubmitsEveryExplicitOption(t *testing.T) {
+func TestTypedQuestionInteractionReviewsBeforeSubmittingEveryExplicitOption(t *testing.T) {
 	id, _ := appserver.ParseRawID(json.RawMessage(`"question-1"`))
 	request := &pendingRequest{ID: id, Kind: requestQuestion, Interactive: true, Questions: []typedQuestion{
 		{ID: "first", Question: "First?", Options: []requestOption{{Label: "A"}, {Label: "B"}}},
@@ -46,15 +46,19 @@ func TestTypedQuestionInteractionSelectsAndSubmitsEveryExplicitOption(t *testing
 	if !session.navigate(1) {
 		t.Fatal("first question option did not move")
 	}
-	if effect, refresh := session.ok(); effect != nil || !refresh || session.questionIndex != 1 {
+	if effect, refresh := session.activate(); effect != nil || !refresh || session.questionIndex != 1 {
 		t.Fatalf("first answer state = effect %#v refresh %v question %d", effect, refresh, session.questionIndex)
 	}
 	if !session.navigate(1) {
 		t.Fatal("second question option did not move")
 	}
-	effect, refresh := session.ok()
+	effect, refresh := session.activate()
+	if effect != nil || !refresh || !session.review {
+		t.Fatalf("final answer did not open review: effect %#v refresh %v review %v", effect, refresh, session.review)
+	}
+	effect, refresh = session.activate()
 	if effect == nil || refresh || session.staged {
-		t.Fatalf("final answer did not submit: effect %#v refresh %v staged %v", effect, refresh, session.staged)
+		t.Fatalf("review did not submit: effect %#v refresh %v staged %v", effect, refresh, session.staged)
 	}
 	encoded, err := json.Marshal(effect.result)
 	if err != nil {
@@ -73,13 +77,19 @@ func TestTypedQuestionHandoffDoesNotSubmitEarlierAnswersOrMatchByLabel(t *testin
 	id, _ := appserver.ParseRawID(json.RawMessage(`"multi-question"`))
 	for _, handoff := range []bool{false, true} {
 		session := &interactionSession{request: &pendingRequest{ID: id, Kind: requestQuestion, Interactive: true, Questions: questions}, answers: make(map[string]string)}
-		if effect, refresh := session.ok(); effect != nil || !refresh {
+		if effect, refresh := session.activate(); effect != nil || !refresh {
 			t.Fatal("first answer submitted before the final question")
 		}
 		if handoff {
 			session.navigate(1)
 		}
-		effect, refresh := session.ok()
+		effect, refresh := session.activate()
+		if !handoff {
+			if effect != nil || !refresh || !session.review {
+				t.Fatalf("final explicit answer did not open review: %#v / %v / %v", effect, refresh, session.review)
+			}
+			effect, refresh = session.activate()
+		}
 		if effect == nil || refresh {
 			t.Fatal("final selection produced no effect")
 		}
@@ -96,19 +106,99 @@ func TestTypedQuestionHandoffDoesNotSubmitEarlierAnswersOrMatchByLabel(t *testin
 	}
 }
 
-func TestTypedQuestionStartIsNoOpWhileNonQuestionStartKeepsConfirmation(t *testing.T) {
+func TestTypedQuestionBackReturnsToPriorAnswerAndReviewScrolls(t *testing.T) {
+	request := &pendingRequest{Kind: requestQuestion, Interactive: true, Questions: []typedQuestion{
+		{ID: "first", Question: "First?", Options: []requestOption{{Label: "A"}, {Label: "B"}}},
+		{ID: "second", Question: "Second?", Options: []requestOption{{Label: "C"}, {Label: "D"}}},
+	}}
+	session := &interactionSession{request: request, answers: make(map[string]string)}
+	assertDisplayed := func(id, want string) {
+		t.Helper()
+		card := session.detailCard(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
+		for _, element := range card.Scene.Elements {
+			if element.ID == id && element.Text != nil {
+				if element.Text.Value != want {
+					t.Fatalf("%s = %q, want %q", id, element.Text.Value, want)
+				}
+				return
+			}
+		}
+		t.Fatalf("missing displayed %s", id)
+	}
+	session.navigate(1)
+	if effect, refresh := session.activate(); effect != nil || !refresh {
+		t.Fatalf("first answer = %#v / %v", effect, refresh)
+	}
+	assertDisplayed("back-question", "Second?")
+	assertDisplayed("front-option-label", "C")
+	session.navigate(1)
+	if effect, refresh := session.activate(); effect != nil || !refresh {
+		t.Fatalf("final answer = %#v / %v", effect, refresh)
+	}
+	assertDisplayed("front-review-answer", "B")
+	if !session.navigate(1) {
+		t.Fatal("review did not scroll")
+	}
+	assertDisplayed("front-review-answer", "D")
+	if !session.questionBack() {
+		t.Fatal("Back closed review instead of returning to the final question")
+	}
+	assertDisplayed("back-question", "Second?")
+	assertDisplayed("front-option-label", "D")
+	if !session.questionBack() {
+		t.Fatal("Back closed the second question instead of returning to the first")
+	}
+	assertDisplayed("back-question", "First?")
+	assertDisplayed("front-option-label", "B")
+}
+
+func TestTypedQuestionBackEditsEarlierAnswerBeforeReviewSubmission(t *testing.T) {
+	id, _ := appserver.ParseRawID(json.RawMessage(`"question-edit"`))
+	session := &interactionSession{request: &pendingRequest{ID: id, Kind: requestQuestion, Interactive: true, Questions: []typedQuestion{
+		{ID: "first", Question: "First?", Options: []requestOption{{Label: "A"}, {Label: "B"}}},
+		{ID: "second", Question: "Second?", Options: []requestOption{{Label: "C"}, {Label: "D"}}},
+	}}, answers: make(map[string]string)}
+
+	if effect, refresh := session.activate(); effect != nil || !refresh || session.questionIndex != 1 {
+		t.Fatalf("first answer = %#v / %v / question=%d", effect, refresh, session.questionIndex)
+	}
+	if !session.questionBack() || session.questionIndex != 0 || session.choiceIndex != 0 {
+		t.Fatalf("back to first answer = question=%d choice=%d", session.questionIndex, session.choiceIndex)
+	}
+	session.navigate(1)
+	if effect, refresh := session.activate(); effect != nil || !refresh || session.questionIndex != 1 {
+		t.Fatalf("edited first answer = %#v / %v / question=%d", effect, refresh, session.questionIndex)
+	}
+	session.navigate(1)
+	if effect, refresh := session.activate(); effect != nil || !refresh || !session.review {
+		t.Fatalf("second answer = %#v / %v / review=%v", effect, refresh, session.review)
+	}
+	effect, refresh := session.activate()
+	if effect == nil || refresh {
+		t.Fatalf("review submission = %#v / %v", effect, refresh)
+	}
+	encoded, err := json.Marshal(effect.result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(encoded) != `{"answers":{"first":{"answers":["B"]},"second":{"answers":["D"]}}}` {
+		t.Fatalf("edited question response = %s", encoded)
+	}
+}
+
+func TestTypedQuestionUsesPlayWhileApprovalKeepsTwoStepConfirmation(t *testing.T) {
 	t.Parallel()
 	question := &interactionSession{request: &pendingRequest{
 		Kind: requestQuestion, Interactive: true,
 		Questions: []typedQuestion{{ID: "choice", Options: []requestOption{{Label: "A"}}}},
-	}}
-	if effect, refresh := question.start(); effect != nil || refresh || question.staged {
-		t.Fatalf("typed ASK START changed state: %#v / %v / %v", effect, refresh, question.staged)
+	}, answers: make(map[string]string)}
+	if effect, refresh := question.activate(); effect != nil || !refresh || !question.review {
+		t.Fatalf("typed ASK PLAY did not open review: %#v / %v / %v", effect, refresh, question.review)
 	}
 
 	approval := &interactionSession{request: &pendingRequest{Kind: requestFile}, actions: []string{"accept"}}
-	if effect, refresh := approval.start(); effect != nil || !refresh || !approval.staged {
-		t.Fatalf("approval START did not stage confirmation: %#v / %v / %v", effect, refresh, approval.staged)
+	if effect, refresh := approval.activate(); effect != nil || !refresh || !approval.staged {
+		t.Fatalf("approval PLAY did not stage confirmation: %#v / %v / %v", effect, refresh, approval.staged)
 	}
 }
 
@@ -199,7 +289,7 @@ func TestTypedQuestionDetailUsesSelectedOptionFrontAndTaskFirstBack(t *testing.T
 
 func TestPlanReadyInteractionIsDisplayOnly(t *testing.T) {
 	session := &interactionSession{card: Card{StateWord: "PLAN READY", ContextLine: "Thread"}, detailKey: "session.plan"}
-	if effect, refresh := session.ok(); effect != nil || refresh || session.staged {
+	if effect, refresh := session.activate(); effect != nil || refresh || session.staged {
 		t.Fatalf("PLAN READY produced action state: effect %#v refresh %v staged %v", effect, refresh, session.staged)
 	}
 	detail := session.detailCard(time.Now())
@@ -228,10 +318,10 @@ func TestRequestContextNeverUsesFullCWDAsIdentity(t *testing.T) {
 
 func TestInterruptInteractionRequiresConfirmationAndKeepsExactTurn(t *testing.T) {
 	session := &interactionSession{threadID: "thread-1", turnID: "turn-7", actions: []string{"interrupt"}}
-	if effect, refresh := session.ok(); effect != nil || !refresh || !session.staged {
+	if effect, refresh := session.activate(); effect != nil || !refresh || !session.staged {
 		t.Fatalf("interrupt did not stage: %#v/%v/%v", effect, refresh, session.staged)
 	}
-	effect, _ := session.ok()
+	effect, _ := session.activate()
 	if effect == nil || effect.threadID != "thread-1" || effect.turnID != "turn-7" {
 		t.Fatalf("interrupt effect = %#v", effect)
 	}

@@ -41,6 +41,63 @@ func TestDispatcherPreservesFIFOAndContinuesAfterHandlerFailure(t *testing.T) {
 	}
 }
 
+func TestDispatcherObservesReleaseEvenWhenItsCallbackIsDiscarded(t *testing.T) {
+	for _, overflow := range []bool{false, true} {
+		name := "foreground change"
+		if overflow {
+			name = "queue overflow"
+		}
+		t.Run(name, func(t *testing.T) {
+			handled := make(chan struct{}, 3)
+			drained := make(chan struct{})
+			d := newTestDispatcher(func(_ context.Context, e *inputpb.InputEvent) error {
+				if b := e.GetButtonEvent(); b != nil && b.GetAction() == inputpb.ButtonAction_PRESS {
+					handled <- struct{}{}
+				}
+				if e.GetEncoderEvent() != nil {
+					close(drained)
+				}
+				return nil
+			}, nil)
+			// Discard the first queued press while it is still physically held.
+			d.Submit(buttonPress(inputpb.Button_START))
+			d.InvalidateContext()
+			d.Submit(buttonPress(inputpb.Button_START))
+			if d.Status().QueueDepth != 0 {
+				t.Fatal("held press entered the new foreground context")
+			}
+			if overflow {
+				for range InputQueueCapacity {
+					d.Submit(encoder(1))
+				}
+			}
+			d.Submit(&inputpb.InputEvent{Event: &inputpb.InputEvent_ButtonEvent{ButtonEvent: &inputpb.ButtonEvent{Button: inputpb.Button_START, Action: inputpb.ButtonAction_RELEASE}}})
+			if !overflow {
+				d.InvalidateContext()
+			}
+			d.Submit(buttonPress(inputpb.Button_START))
+			d.Submit(buttonPress(inputpb.Button_START))
+			// The sentinel proves both presses were processed before cancellation.
+			d.Submit(encoder(1))
+			ctx, cancel := context.WithCancel(t.Context())
+			done := make(chan error, 1)
+			go func() { done <- d.Run(ctx) }()
+			select {
+			case <-drained:
+			case <-time.After(time.Second):
+				t.Error("input queue did not drain after release")
+			}
+			cancel()
+			if err := <-done; err != nil {
+				t.Fatal(err)
+			}
+			if got := len(handled); got != 1 {
+				t.Fatalf("handled presses after discarded release = %d, want one fresh press", got)
+			}
+		})
+	}
+}
+
 func TestDispatcherOverflowIsNonBlockingAndCoalescesCancellation(t *testing.T) {
 	var canceled atomic.Int32
 	dispatcher := newTestDispatcher(func(context.Context, *inputpb.InputEvent) error { return nil }, func(context.Context) {

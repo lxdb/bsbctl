@@ -1,6 +1,6 @@
 # GitHub Notifications
 
-GitHub Notifications shows unread notifications from selected GitHub.com repositories. Collection uses read requests. START opens the exact comment or subject, then marks that GitHub notification thread read. Dismiss marks it read without opening.
+GitHub Notifications shows unread notifications from selected GitHub.com repositories. Collection uses read requests. On a notification card, Play/Pause opens the exact comment or subject, then marks that GitHub notification thread read. Select Mark read to mark the thread read without opening it.
 
 ## Before setup
 
@@ -92,25 +92,26 @@ The initial complete result creates one attention episode for each current unrea
 
 | View or input | Result |
 | --- | --- |
-| Notification card + START/PAUSE | Opens the latest comment when available, otherwise the exact subject, then marks that notification thread read. |
-| Notification card + encoder | Shows **Dismiss this GitHub notification?** for that exact thread. |
-| Dismiss + START/PAUSE | Marks the thread read without opening GitHub. |
-| Dismiss + BACK | Cancels dismissal and returns to the card. |
+| Notification card + Play/Pause | Opens the latest comment when available, otherwise the exact subject, then marks that notification thread read. |
+| Notification card + encoder | Opens the action selector with Open and mark read selected. Later turns change the selected action. |
+| Mark read + Play/Pause | Marks the thread read without opening GitHub. |
+| Detail + BACK | Returns to the notification list. |
 | APPS launcher | Opens the current unread list, including threads excluded by the attention filter. |
-| Manual list + encoder / OK | Selects a thread / opens its detail. |
-| Manual list or detail + START/PAUSE | Opens and marks the selected thread read. |
+| Manual list + encoder / Play/Pause | Selects a thread / opens its detail. |
+| Detail + encoder / Play/Pause | Selects Open and mark read or Mark read / applies the selected action. |
+| Rotary press | Has no action. |
 
 The fixed 16x16 GitHub icon occupies x=0..15. Pixels x=16..17 stay empty; only the main text in x=18..71 scrolls. Cards show a full reason phrase and subject title, with `owner/repository` in the small row. This front-display content is visible by default; `rear_details` continues to control only the rear display.
 
 `notification_reasons` defaults to `"actionable"`: `approval_requested`, `assign`, `invitation`, `mention`, `review_requested`, `security_alert`, and `team_mention`. An explicit array may also select `author`, `ci_activity`, `comment`, `manual`, `member_feature_requested`, `security_advisory_credit`, `state_change`, or `subscribed`. `"all"` includes unrecognized provider reasons using the generic phrase `GitHub update`. Duplicate, empty, and unknown explicit values are rejected.
 
-Open resolves `latest_comment_url` first and then the subject API URL. Both must belong to the captured repository, and the returned browser URL must be a safe GitHub HTTPS URL in that repository. There is no generic inbox fallback. If neither target is available, the app leaves the item available and explains that Dismiss remains possible.
+Open resolves `latest_comment_url` first and then the subject API URL. Both must belong to the captured repository, and the returned browser URL must be a safe GitHub HTTPS URL in that repository. There is no generic inbox fallback. If neither target is available, the item remains in the list and Mark read is still available.
 
-**Dismiss means mark read**, not mark done, unsubscribe, or close the issue or pull request. Both actions send one `PATCH /notifications/threads/{thread_id}`; `205` and `304` confirm the outcome. Opening and marking read are ordered external effects under one execution grant, and are not atomic. A failed opener sends no PATCH. A rejected PATCH after successful Open reports that GitHub opened but the notification could not be marked read.
+Mark read does not mark the notification done, unsubscribe, or close the issue or pull request. Both actions send one `PATCH /notifications/threads/{thread_id}`; `205` and `304` confirm the outcome. Opening and marking read are ordered external effects under one execution grant, and are not atomic. A failed opener sends no PATCH. A rejected PATCH after successful Open reports that GitHub opened but the notification could not be marked read.
 
 If the PATCH response is lost or ambiguous, the app checkpoints a reconciliation marker, withdraws that attention episode, and checks GitHub again using read requests. It never automatically repeats the write or browser launch. A complete fresh result showing the same thread unread allows another explicit user action; a read or absent thread removes the card. Partial results and `304` alone do not settle an ambiguous write. GitHub provides no `updated_at` compare-and-set for this endpoint, so activity arriving during a PATCH can also become read.
 
-Setup, token, rate-limit, target and incomplete-coverage cards explain the situation in full text. Successful Open and Dismiss remove the card without a persistent success banner.
+Setup, token, rate-limit, target and incomplete-coverage cards explain the situation in full text. Either successful action removes the card without a persistent success banner.
 
 ## Inspect collection
 

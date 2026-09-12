@@ -71,12 +71,21 @@ func TestHandlerPublishesAndInvokesOnlyTheExactUpcomingObservation(t *testing.T)
 	if chooser.Channel != ChannelInteraction || chooser.Disposition != protocol.DispositionSnapshot {
 		t.Fatalf("chooser observation = %#v", chooser)
 	}
-	result, err := handler.HandleSessionInput(context.Background(), calendarSessionInputRequest(t, AppID, 7, "interactive-9", calendarButtonInput(protocol.ButtonOK)))
+	ignored, err := handler.HandleSessionInput(context.Background(), calendarSessionInputRequest(t, AppID, 7, "interactive-9", calendarButtonInput(protocol.ButtonOK)))
+	if err != nil || ignored.Disposition != protocol.SessionInputNotConsumed {
+		t.Fatalf("rotary press result = %#v, %v", ignored, err)
+	}
+	select {
+	case <-host.executions:
+		t.Fatal("rotary press requested an execution grant")
+	default:
+	}
+	result, err := handler.HandleSessionInput(context.Background(), calendarSessionInputRequest(t, AppID, 7, "interactive-9", calendarButtonInput(protocol.ButtonStart)))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if result.Disposition != protocol.SessionInputConsumed {
-		t.Fatalf("Calendar OK result = %#v", result)
+		t.Fatalf("Calendar Play/Pause result = %#v", result)
 	}
 	select {
 	case execution := <-host.executions:
@@ -217,8 +226,8 @@ func TestHandlerChooserRoutesEncoderAttendSkipAndBack(t *testing.T) {
 		want       attendanceDecision
 		checkpoint bool
 	}{
-		{name: "attend", delta: 1, button: protocol.ButtonOK, want: decisionAttending, checkpoint: true},
-		{name: "skip", delta: 2, button: protocol.ButtonOK, want: decisionSkipped, checkpoint: true},
+		{name: "attend", delta: 1, button: protocol.ButtonStart, want: decisionAttending, checkpoint: true},
+		{name: "skip", delta: 2, button: protocol.ButtonStart, want: decisionSkipped, checkpoint: true},
 		{name: "back", button: protocol.ButtonBack},
 	}
 	for _, test := range tests {
@@ -293,7 +302,7 @@ func TestHandlerPersistsFailedCheckpointOnRefreshWithoutOpeningJoinURLAgain(t *t
 		t.Fatal(err)
 	}
 	_ = nextHandlerObservation(t, host.observations)
-	if _, err := handler.HandleSessionInput(t.Context(), calendarSessionInputRequest(t, AppID, 4, token, calendarButtonInput(protocol.ButtonOK))); err == nil {
+	if _, err := handler.HandleSessionInput(t.Context(), calendarSessionInputRequest(t, AppID, 4, token, calendarButtonInput(protocol.ButtonStart))); err == nil {
 		t.Fatal("checkpoint failure was acknowledged as a successful choice")
 	}
 	<-host.checkpoints
@@ -359,7 +368,7 @@ func TestHandlerClosesGrantedSessionWhenJoinEffectFails(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = nextHandlerObservation(t, host.observations)
-	if _, err := handler.HandleSessionInput(t.Context(), calendarSessionInputRequest(t, AppID, 4, token, calendarButtonInput(protocol.ButtonOK))); err == nil {
+	if _, err := handler.HandleSessionInput(t.Context(), calendarSessionInputRequest(t, AppID, 4, token, calendarButtonInput(protocol.ButtonStart))); err == nil {
 		t.Fatal("failed URL effect returned success")
 	}
 	if execution := <-host.executions; execution.SessionToken != token {

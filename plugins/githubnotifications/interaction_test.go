@@ -96,28 +96,35 @@ func TestAttentionOnePressOpensExactURLAndMarksRead(t *testing.T) {
 		t.Fatal("duplicate opened again")
 	}
 }
-func TestEncoderDismissMarksReadWithoutOpening(t *testing.T) {
+func TestEncoderSelectsMarkReadWithoutOpening(t *testing.T) {
 	h, w, host, opened := interactionFixture(t)
+	var writes []string
+	w.source = newProvider(testClient(func(r *http.Request) (*http.Response, error) {
+		writes = append(writes, r.Method+" "+r.URL.Path)
+		return response(205, "", nil), nil
+	}), "fake")
 	startPanel(t, h, w, true)
 	_, err := h.HandleSessionInput(t.Context(), protocol.SessionInputRequest{Instance: w.ref, SessionToken: "session-1", Sequence: 1, OccurredAt: w.now(), Input: protocol.SessionInput{Encoder: &protocol.EncoderInput{Delta: 1}}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if w.session.level != panelConfirm || len(host.grants) != 0 {
-		t.Fatal("encoder did not stage dismissal")
+	if !strings.Contains(sceneText(w.sessionScene()), "PLAY: OPEN AND MARK READ") || len(host.grants) != 0 {
+		t.Fatal("opening encoder changed the default action")
 	}
-	if _, err := press(h, w, 2, protocol.ButtonBack); err != nil {
+	if _, err := h.HandleSessionInput(t.Context(), protocol.SessionInputRequest{Instance: w.ref, SessionToken: "session-1", Sequence: 2, OccurredAt: w.now(), Input: protocol.SessionInput{Encoder: &protocol.EncoderInput{Delta: 1}}}); err != nil {
 		t.Fatal(err)
 	}
-	if w.session.level != panelDetail {
-		t.Fatal("BACK did not cancel dismissal")
+	if !strings.Contains(sceneText(w.sessionScene()), "PLAY: MARK READ") {
+		t.Fatal("encoder did not select mark read")
 	}
-	_, _ = h.HandleSessionInput(t.Context(), protocol.SessionInputRequest{Instance: w.ref, SessionToken: "session-1", Sequence: 3, OccurredAt: w.now(), Input: protocol.SessionInput{Encoder: &protocol.EncoderInput{Delta: -2}}})
-	if _, err := press(h, w, 4, protocol.ButtonStart); err != nil {
+	if _, err := press(h, w, 3, protocol.ButtonStart); err != nil {
 		t.Fatal(err)
 	}
 	if len(w.state.items) != 0 || len(*opened) != 0 || len(host.grants) != 1 || len(host.completed) != 1 {
 		t.Fatal("dismissal did not mark read exactly once without opener")
+	}
+	if len(writes) != 1 || writes[0] != "PATCH /notifications/threads/17" {
+		t.Fatalf("mark-read requests = %v, want one PATCH for the selected thread", writes)
 	}
 }
 func TestPanelRejectsInvalidatedSelectionAndUnsafeTargets(t *testing.T) {
@@ -246,7 +253,7 @@ func rotate(t *testing.T, h *Handler, w *worker, seq uint64, delta int32) {
 		t.Fatal(err)
 	}
 }
-func TestPanelSelectionNavigationFreezesConfirmation(t *testing.T) {
+func TestPanelSelectionRejectsChangedActionTarget(t *testing.T) {
 	h, w, host, opened := interactionFixture(t)
 	first := w.state.ordered()[0]
 	other := first
@@ -260,23 +267,22 @@ func TestPanelSelectionNavigationFreezesConfirmation(t *testing.T) {
 	if w.session.selected.ID != other.ID {
 		t.Fatal("manual list did not select next thread")
 	}
-	if _, err := press(h, w, 2, protocol.ButtonOK); err != nil {
+	if _, err := press(h, w, 2, protocol.ButtonStart); err != nil {
 		t.Fatal(err)
 	}
-	rotate(t, h, w, 3, 1)
 	other.Revision++
 	w.state.items[other.ID] = other
-	if _, err := press(h, w, 4, protocol.ButtonStart); !errors.Is(err, ErrStaleNotification) {
-		t.Fatalf("changed confirmation: %v", err)
+	if _, err := press(h, w, 3, protocol.ButtonStart); !errors.Is(err, ErrStaleNotification) {
+		t.Fatalf("changed action target: %v", err)
 	}
 	if len(*opened) != 0 || len(host.grants) != 0 {
 		t.Fatal("changed confirmation executed")
 	}
-	if _, err := press(h, w, 5, protocol.ButtonBack); err != nil {
+	if _, err := press(h, w, 4, protocol.ButtonBack); err != nil {
 		t.Fatal(err)
 	}
-	if w.session.level != panelDetail {
-		t.Fatal("dismiss BACK did not return to detail")
+	if w.session.level != panelList {
+		t.Fatal("detail BACK did not return to list")
 	}
 }
 
@@ -302,18 +308,32 @@ func TestConnectionTriggerOpensListWithoutEffect(t *testing.T) {
 	}
 }
 func TestReleaseDuplicateAndReplacedSessionInputsDoNotNavigateOrOpen(t *testing.T) {
-	h, w, _, opened := interactionFixture(t)
+	h, w, host, opened := interactionFixture(t)
 	startPanel(t, h, w, false)
 	if _, err := press(h, w, 1, protocol.ButtonOK); err != nil {
 		t.Fatal(err)
 	}
-	_, _ = press(h, w, 1, protocol.ButtonOK)
-	if !strings.Contains(sceneText(w.sessionScene()), "TURN: DISMISS") {
-		t.Fatal("duplicate OK navigated twice")
+	if !strings.Contains(sceneText(w.sessionScene()), "TURN SELECT") {
+		t.Fatal("OK changed the list")
 	}
 	r := protocol.SessionInputRequest{Instance: w.ref, SessionToken: "session-1", Sequence: 2, OccurredAt: w.now(), Input: protocol.SessionInput{Button: &protocol.ButtonInput{Button: protocol.ButtonStart, Action: protocol.ButtonRelease}}}
 	if _, err := h.HandleSessionInput(t.Context(), r); err != nil {
 		t.Fatal(err)
+	}
+	if !strings.Contains(sceneText(w.sessionScene()), "TURN SELECT") || len(host.grants) != 0 || len(*opened) != 0 {
+		t.Fatal("release navigated or executed an action")
+	}
+	if _, err := press(h, w, 3, protocol.ButtonStart); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(sceneText(w.sessionScene()), "PLAY: OPEN AND MARK READ") {
+		t.Fatal("Play did not open notification details")
+	}
+	if _, err := press(h, w, 3, protocol.ButtonStart); err != nil {
+		t.Fatal(err)
+	}
+	if len(host.grants) != 0 || len(*opened) != 0 || !strings.Contains(sceneText(w.sessionScene()), "PLAY: OPEN AND MARK READ") {
+		t.Fatal("duplicate Play executed the displayed action")
 	}
 	if err := h.EndSession(t.Context(), protocol.SessionEndRequest{Instance: w.ref, SessionToken: "older"}); err != nil {
 		t.Fatal(err)
@@ -326,7 +346,7 @@ func TestReleaseDuplicateAndReplacedSessionInputsDoNotNavigateOrOpen(t *testing.
 	}
 	startPanel(t, h, w, false)
 	w.session.token = "replacement"
-	r.Sequence = 3
+	r.Sequence = 4
 	r.Input.Button.Action = protocol.ButtonPress
 	if _, err := h.HandleSessionInput(t.Context(), r); err != nil {
 		t.Fatal(err)

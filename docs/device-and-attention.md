@@ -6,12 +6,14 @@ bsbctl selects one presentation from the enabled apps. Plugins report state; the
 
 | Input | Effect |
 | --- | --- |
-| Encoder | Move through the app selector or current panel. |
-| OK | Open or confirm the selected option. |
-| START/PAUSE | Open the action offered by the displayed card, if any. |
+| Encoder rotation | Select a visible item or action, or scroll the message reader. Rotation never executes an action. |
+| OK / encoder press | No action in the launcher or bundled apps. |
+| Play/Pause | Open the selected item or execute the displayed action. Release before pressing again. Plugin input identifies this button as `start`. |
 | BACK | Let the app handle navigation first; otherwise close the current view. |
 
-The APPS selector lists enabled, ready apps with an interactive policy and launch action. Built-in launcher panels are read-only. To change external state, open the action from its exact event or request card.
+The APPS selector lists enabled, ready apps with an interactive policy and launch action. Turn to select an app and press Play/Pause to open it. Calendar and Codex launcher panels are read-only; their actions start from an exact event or request card. Slack and GitHub notification lists let you open an item and select its action. BACK returns to the list without executing an action.
+
+Each action applies to the selected item. Background updates must not substitute another target. Codex approvals require a separate confirmation press; question answers are submitted from a final review. External plugins can still receive the protocol's `ok` input and define their own controls.
 
 When an app does not consume BACK, the daemon closes the current view and suppresses non-critical presentation for 30 seconds. Critical actionable attention can still appear.
 

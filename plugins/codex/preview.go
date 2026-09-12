@@ -98,6 +98,13 @@ func PreviewScenes(now time.Time) ([]protocol.Scene, error) {
 		card: questionCard, request: &pending, requestKey: pending.Key, answers: make(map[string]string),
 	}).detailCard(now)
 	scenes = append(scenes, cardPresentation(detail))
+	review := &interactionSession{
+		card: questionCard, request: &pending, requestKey: pending.Key, answers: make(map[string]string),
+	}
+	if effect, refresh := review.activate(); effect != nil || !refresh || !review.review {
+		return nil, errors.New("production interaction did not open the preview answer review")
+	}
+	scenes = append(scenes, cardPresentation(review.detailCard(now)))
 
 	compaction := newPreviewReducer(now)
 	compaction.Apply(previewNotification("item/started", fmt.Sprintf(`{"threadId":"preview-thread","turnId":"preview-turn","startedAtMs":%d,"item":{"id":"preview-compaction","type":"contextCompaction"}}`, now.UnixMilli())))

@@ -76,10 +76,18 @@ func reasonText(reason string) string {
 		return "GitHub update"
 	}
 }
-func attentionScene(c Config, i item) protocol.Scene {
-	lines := []string{reasonText(i.Reason), i.Alias + " / " + i.SubjectType, "START: OPEN AND MARK READ", "TURN: DISMISS"}
+func attentionScene(c Config, i item, actions ...int) protocol.Scene {
+	action := 0
+	if len(actions) > 0 {
+		action = actions[0]
+	}
+	actionText := "PLAY: OPEN AND MARK READ"
+	if action == 1 {
+		actionText = "PLAY: MARK READ"
+	}
+	lines := []string{reasonText(i.Reason), i.Alias + " / " + i.SubjectType, actionText, "TURN ACTION / BACK LIST"}
 	if c.RearDetails {
-		lines = []string{reasonText(i.Reason), i.Repository, i.Title, "START: OPEN AND MARK READ", "TURN: DISMISS"}
+		lines = []string{reasonText(i.Reason), i.Repository, i.Title, actionText, "TURN ACTION / BACK LIST"}
 	}
 	scene := withContext(notificationScene(reasonText(i.Reason)+": "+i.Title, lines...), i.Repository)
 	scene.Elements[1].Text.Color = attentionColor
@@ -93,7 +101,7 @@ func connectionText(w *worker) string {
 	case "opened_read_failed":
 		return "Opened GitHub, but could not mark this notification read"
 	case "open_failed":
-		return "GitHub did not open - press START to try again"
+		return "GitHub did not open - press PLAY to try again"
 	}
 	code := w.actionError
 	if code == "" {
@@ -149,10 +157,7 @@ func (w *worker) sessionScene() protocol.Scene {
 				position = index + 1
 			}
 		}
-		return withContext(notificationScene(reasonText(i.Reason)+": "+i.Title, fmt.Sprintf("NOTIFICATIONS %d/%d", position, len(w.state.items)), i.Alias, "TURN SELECT / OK DETAIL", "START OPEN AND MARK READ"), i.Repository)
+		return withContext(notificationScene(reasonText(i.Reason)+": "+i.Title, fmt.Sprintf("NOTIFICATIONS %d/%d", position, len(w.state.items)), i.Alias, "TURN SELECT / PLAY DETAIL", "BACK CLOSE"), i.Repository)
 	}
-	if s.level == panelConfirm {
-		return withContext(notificationScene("Dismiss this GitHub notification?", "MARK THIS THREAD READ", "START: CONFIRM", "BACK: CANCEL"), i.Repository)
-	}
-	return attentionScene(w.config, i)
+	return attentionScene(w.config, i, s.action)
 }

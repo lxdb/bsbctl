@@ -27,6 +27,8 @@ type interactionSession struct {
 	actionIndex   int
 	questionIndex int
 	choiceIndex   int
+	review        bool
+	reviewIndex   int
 	answers       map[string]string
 	staged        bool
 	processing    bool
@@ -166,17 +168,13 @@ func (w *codexWorker) handleInput(ctx context.Context, token string, input *prot
 			if session.staged {
 				session.staged = false
 				refresh = true
+			} else if session.questionBack() {
+				refresh = true
 			} else {
 				closeSession = true
 			}
-		case protocol.ButtonOK:
-			effect, refresh = session.ok()
-			consumed = effect != nil || refresh
-			if effect != nil {
-				session.processing = true
-			}
 		case protocol.ButtonStart:
-			effect, refresh = session.start()
+			effect, refresh = session.activate()
 			consumed = effect != nil || refresh
 			if effect != nil {
 				session.processing = true
@@ -245,6 +243,10 @@ func (s *interactionSession) navigate(delta int) bool {
 		return false
 	}
 	if s.request != nil && s.request.Kind == requestQuestion && s.request.Interactive {
+		if s.review {
+			s.reviewIndex = wrappedIndex(s.reviewIndex+delta, len(s.request.Questions))
+			return true
+		}
 		options := s.request.Questions[s.questionIndex].Options
 		s.choiceIndex = wrappedIndex(s.choiceIndex+delta, len(options))
 		return true
@@ -256,8 +258,11 @@ func (s *interactionSession) navigate(delta int) bool {
 	return false
 }
 
-func (s *interactionSession) ok() (*interactionEffect, bool) {
+func (s *interactionSession) activate() (*interactionEffect, bool) {
 	if s.request != nil && s.request.Kind == requestQuestion && s.request.Interactive {
+		if s.review {
+			return s.responseEffect(), false
+		}
 		question := s.request.Questions[s.questionIndex]
 		option := question.Options[s.choiceIndex]
 		if option.AnswerInCodex {
@@ -266,10 +271,12 @@ func (s *interactionSession) ok() (*interactionEffect, bool) {
 		s.answers[question.ID] = option.Label
 		if s.questionIndex < len(s.request.Questions)-1 {
 			s.questionIndex++
-			s.choiceIndex = 0
+			s.choiceIndex = s.answerChoiceIndex(s.questionIndex)
 			return nil, true
 		}
-		return s.responseEffect(), false
+		s.review = true
+		s.reviewIndex = 0
+		return nil, true
 	}
 	if len(s.actions) == 0 {
 		return nil, false
@@ -284,11 +291,35 @@ func (s *interactionSession) ok() (*interactionEffect, bool) {
 	return s.responseEffect(), false
 }
 
-func (s *interactionSession) start() (*interactionEffect, bool) {
-	if s.request != nil && s.request.Kind == requestQuestion && s.request.Interactive {
-		return nil, false
+func (s *interactionSession) questionBack() bool {
+	if s.request == nil || s.request.Kind != requestQuestion || !s.request.Interactive {
+		return false
 	}
-	return s.ok()
+	if s.review {
+		s.review = false
+		s.questionIndex = len(s.request.Questions) - 1
+		s.choiceIndex = s.answerChoiceIndex(s.questionIndex)
+		return true
+	}
+	if s.questionIndex == 0 {
+		return false
+	}
+	s.questionIndex--
+	s.choiceIndex = s.answerChoiceIndex(s.questionIndex)
+	return true
+}
+
+func (s *interactionSession) answerChoiceIndex(questionIndex int) int {
+	if s.request == nil || questionIndex < 0 || questionIndex >= len(s.request.Questions) {
+		return 0
+	}
+	answer := s.answers[s.request.Questions[questionIndex].ID]
+	for index, option := range s.request.Questions[questionIndex].Options {
+		if option.Label == answer {
+			return index
+		}
+	}
+	return 0
 }
 
 func (s *interactionSession) responseEffect() *interactionEffect {
@@ -337,13 +368,19 @@ func (s *interactionSession) detailCard(now time.Time) Card {
 	if s.request != nil {
 		card.ContextLine = requestContext(*s.request, s.sensitive)
 		if s.request.Kind == requestQuestion && s.request.Interactive {
-			question := s.request.Questions[s.questionIndex]
-			option := question.Options[s.choiceIndex]
-			questionPosition := fmt.Sprintf("QUESTION %d/%d", s.questionIndex+1, len(s.request.Questions))
-			optionPosition := fmt.Sprintf("OPTION %d/%d", s.choiceIndex+1, len(question.Options))
-			card.DetailLine = optionPosition
 			card.Disposition = protocol.DispositionActionable
-			card.Scene = typedQuestionScene(card, questionPosition, question.Question, optionPosition, option)
+			if s.review {
+				question := s.request.Questions[s.reviewIndex]
+				card.DetailLine = fmt.Sprintf("REVIEW %d/%d", s.reviewIndex+1, len(s.request.Questions))
+				card.Scene = answerReviewScene(card, card.DetailLine, question.Question, s.answers[question.ID])
+			} else {
+				question := s.request.Questions[s.questionIndex]
+				option := question.Options[s.choiceIndex]
+				questionPosition := fmt.Sprintf("QUESTION %d/%d", s.questionIndex+1, len(s.request.Questions))
+				optionPosition := fmt.Sprintf("OPTION %d/%d", s.choiceIndex+1, len(question.Options))
+				card.DetailLine = optionPosition
+				card.Scene = typedQuestionScene(card, questionPosition, question.Question, optionPosition, option)
+			}
 		} else if s.request.Interactive && len(s.actions) != 0 {
 			card.DetailLine = actionLabel(s.actions[s.actionIndex])
 			card.Disposition = protocol.DispositionActionable
@@ -355,7 +392,7 @@ func (s *interactionSession) detailCard(now time.Time) Card {
 		card.Disposition = protocol.DispositionActionable
 	}
 	if s.staged {
-		card.DetailLine = "OK CONFIRM / BACK"
+		card.DetailLine = "PLAY: CONFIRM " + actionLabel(s.actions[s.actionIndex])
 		card.Impact = protocol.ImpactCritical
 	}
 	return card

@@ -3,9 +3,11 @@ package slack
 import (
 	"context"
 	"errors"
-	"github.com/lxdb/bsbctl/sdk/protocol"
+	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/lxdb/bsbctl/sdk/protocol"
 )
 
 func TestConfiguredChannelMessagesEnterPendingWithoutMention(t *testing.T) {
@@ -52,7 +54,7 @@ func TestAcceptedSlackOpenClearsPendingEvenWhenCheckpointFails(t *testing.T) {
 	}
 	host.save = func(context.Context, protocol.CheckpointRequest) error { return errors.New("disk unavailable") }
 	startPanel(t, h, w, nil)
-	_, _ = press(h, w, protocol.ButtonOK)
+	_, _ = press(h, w, protocol.ButtonStart)
 	_, _ = press(h, w, protocol.ButtonStart)
 	if opened != 1 || !w.state.items()[0].Handled || !w.dirty {
 		t.Fatal("accepted Open did not clear pending in memory")
@@ -81,7 +83,7 @@ func TestFrontPreviewConsentIsIndependentOfRearDetails(t *testing.T) {
 	for _, front := range []bool{false, true} {
 		for _, rear := range []bool{false, true} {
 			cfg := config{frontMessagePreview: front, rearDetails: rear}
-			scene := detailScene(cfg, workerSnapshot{Fresh: true}, activity{Kind: "dm", Preview: "message-canary"}, 0, fixtureNow)
+			scene := detailScene(cfg, workerSnapshot{Fresh: true}, activity{Kind: "dm", Preview: "message-canary"}, panelOpen, fixtureNow)
 			var frontBody, rearBody bool
 			for _, e := range scene.Elements {
 				if e.Text != nil && strings.Contains(e.Text.Value, "message-canary") {
@@ -92,10 +94,52 @@ func TestFrontPreviewConsentIsIndependentOfRearDetails(t *testing.T) {
 					}
 				}
 			}
-			if frontBody != front || rearBody != rear {
+			if frontBody != front || rearBody {
 				t.Fatalf("consent front=%t rear=%t rendered front=%t rear=%t", front, rear, frontBody, rearBody)
 			}
 		}
+	}
+}
+
+func TestMessageReaderRequiresRearDetailsConsent(t *testing.T) {
+	for _, rear := range []bool{false, true} {
+		t.Run(fmt.Sprintf("rear=%t", rear), func(t *testing.T) {
+			h, w, host := panelFixture(t)
+			w.cfg.frontMessagePreview = true
+			w.cfg.rearDetails = rear
+			w.reduce(callback("EvReader", `{"type":"message","channel":"D123","channel_type":"im","user":"U456","ts":"2.000001","text":"message-canary"}`))
+			h.open = func(context.Context, string) error { t.Error("reader navigation opened Slack"); return nil }
+			host.grant = func(context.Context) error {
+				t.Error("reader navigation requested execution")
+				return errors.New("unexpected grant")
+			}
+			startPanel(t, h, w, nil)
+			if _, err := press(h, w, protocol.ButtonStart); err != nil {
+				t.Fatal(err)
+			}
+			for range 2 {
+				_, err := h.HandleSessionInput(t.Context(), protocol.SessionInputRequest{Instance: w.instance.Ref(), SessionToken: "session-1", Sequence: testInputSequence.Add(1), OccurredAt: w.now().UTC(), Input: protocol.SessionInput{Encoder: &protocol.EncoderInput{Delta: 1}}})
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			text := publishedPanelText(t, host)
+			if !rear {
+				if strings.Contains(text, "PLAY: READ") || !strings.Contains(text, "PLAY: OPEN IN SLACK") {
+					t.Fatalf("reader offered without rear consent: %q", text)
+				}
+				return
+			}
+			if !strings.Contains(text, "PLAY: READ") {
+				t.Fatalf("reader missing with rear consent: %q", text)
+			}
+			if _, err := press(h, w, protocol.ButtonStart); err != nil {
+				t.Fatal(err)
+			}
+			if text := publishedPanelText(t, host); !strings.Contains(text, "PAGE 1/1") || !strings.Contains(text, "message-canary") {
+				t.Fatalf("reader did not display retained message: %q", text)
+			}
+		})
 	}
 }
 
@@ -104,15 +148,15 @@ func TestRepeatedInputDoesNotToggleDismissOrReopen(t *testing.T) {
 	opens := 0
 	h.open = func(context.Context, string) error { opens++; return nil }
 	startPanel(t, h, w, nil)
-	_, _ = press(h, w, protocol.ButtonOK)
+	_, _ = press(h, w, protocol.ButtonStart)
 	request := protocol.SessionInputRequest{Instance: w.instance.Ref(), SessionToken: "session-1", Sequence: testInputSequence.Add(1), OccurredAt: w.now().UTC(), Input: protocol.SessionInput{Encoder: &protocol.EncoderInput{Delta: 1}}}
 	for range 2 {
 		if _, err := h.HandleSessionInput(t.Context(), request); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if w.panel.level != panelDismiss {
-		t.Fatal("duplicate encoder toggled confirmation away")
+	if w.panel.level != panelDetail || w.panel.action != panelHandle {
+		t.Fatal("duplicate encoder changed the selected action")
 	}
 	request.Sequence = testInputSequence.Add(1)
 	request.Input = protocol.SessionInput{Button: &protocol.ButtonInput{Button: protocol.ButtonStart, Action: protocol.ButtonPress}}
@@ -120,6 +164,10 @@ func TestRepeatedInputDoesNotToggleDismissOrReopen(t *testing.T) {
 		if _, err := h.HandleSessionInput(t.Context(), request); err != nil {
 			t.Fatal(err)
 		}
+	}
+	request.Sequence = testInputSequence.Add(1)
+	if _, err := h.HandleSessionInput(t.Context(), request); err != nil {
+		t.Fatal(err)
 	}
 	if opens != 0 || host.completes != 1 || len(pendingItems(w.snapshot().Items)) != 0 {
 		t.Fatal("dismiss replayed or failed to clear pending")

@@ -95,6 +95,8 @@ When a daemon channel policy sets `activation_input: "start"` or `"start_or_enco
 
 The forwarded input retains the original event time and uses the broker-assigned sequence. It is bound to the promoted session. A pending, canceled, or replaced session cannot receive this input, and the daemon must not redirect it to a different foreground session.
 
+For physical Play/Pause (`start`) input, the daemon accepts one press until it observes release. Repeated presses without release are discarded even if the foreground session changes. Bundled apps use Play/Pause for activation and leave `ok` inert; the wire protocol continues to deliver `ok` to external plugins.
+
 `plugin.session.start` must not request execution while its session is pending.
 
 Only Back press uses its result synchronously for presentation ownership. The daemon gives the exact foreground session first refusal. `consumed` preserves plugin handling and causes no dismissal cooldown. `not_consumed`, a stale or absent session, timeout, process loss, callback error, or malformed response executes one daemon fallback: close the foreground and launcher, clear the physical presentation, tombstone only the exact dismissed observation revision, and start one non-configurable process-local 30-second gate. Non-critical presentation is suppressed during the gate; critical actionable attention bypasses it. Back release produces no second action. The gate is not persisted, does not award delivery or scheduling credit, and reevaluates fresh observations when it expires.

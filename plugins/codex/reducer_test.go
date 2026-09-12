@@ -293,7 +293,7 @@ func TestReducerSeparatesStatusOnlyOpenCodexFromExactTypedAsk(t *testing.T) {
 		Params: json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","itemId":"item-1","isBlocking":true,"questions":[{"id":"choice","header":"Choice","question":"Choose","isSecret":false,"isOther":false,"options":[{"label":"A","description":"First"}]}]}`),
 	}})
 	exact := findStateCard(t, reducer.Cards(), "ASK")
-	if exact.Channel != ChannelAttention || exact.Disposition != protocol.DispositionActionable || exact.DetailLine != "START TO ANSWER" {
+	if exact.Channel != ChannelAttention || exact.Disposition != protocol.DispositionActionable || exact.DetailLine != "PLAY TO ANSWER" {
 		t.Fatalf("exact ASK card = %#v", exact)
 	}
 }

@@ -25,7 +25,7 @@ func TestRouterBlockedLaunchDoesNotHoldStateLockOrCloseNewMenu(t *testing.T) {
 	launchDone := make(chan error, 1)
 	go func() {
 		launchDone <- router.Handle(context.Background(), &inputpb.InputEvent{Event: &inputpb.InputEvent_ButtonEvent{
-			ButtonEvent: &inputpb.ButtonEvent{Button: inputpb.Button_OK, Action: inputpb.ButtonAction_PRESS},
+			ButtonEvent: &inputpb.ButtonEvent{Button: inputpb.Button_START, Action: inputpb.ButtonAction_PRESS},
 		}})
 	}()
 	<-started
@@ -93,7 +93,7 @@ func TestRouterCurrentPublishFailureDeactivatesInvisibleMenu(t *testing.T) {
 	if router.Active() || withdrawals != 1 {
 		t.Fatalf("failed menu state: active=%t withdrawals=%d", router.Active(), withdrawals)
 	}
-	if err := router.Handle(t.Context(), buttonPress(inputpb.Button_OK)); err != nil {
+	if err := router.Handle(t.Context(), buttonPress(inputpb.Button_START)); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -129,7 +129,7 @@ func TestRouterStalePublishFailureDoesNotCloseNewerMenu(t *testing.T) {
 	}
 }
 
-func TestRouterOpensAppsNavigatesAndLaunchesOnOKPress(t *testing.T) {
+func TestRouterOpensAppsNavigatesAndLaunchesOnPlayPress(t *testing.T) {
 	t.Parallel()
 	backend := &fakeLauncher{apps: []App{
 		{ID: "ball8", DisplayName: "Magic 8 Ball", Action: "ask"},
@@ -161,9 +161,9 @@ func TestRouterOpensAppsNavigatesAndLaunchesOnOKPress(t *testing.T) {
 		t.Fatalf("selected text = %q", selected)
 	}
 	if err := router.Handle(context.Background(), &inputpb.InputEvent{Event: &inputpb.InputEvent_ButtonEvent{
-		ButtonEvent: &inputpb.ButtonEvent{Button: inputpb.Button_OK, Action: inputpb.ButtonAction_PRESS},
+		ButtonEvent: &inputpb.ButtonEvent{Button: inputpb.Button_START, Action: inputpb.ButtonAction_PRESS},
 	}}); err != nil {
-		t.Fatalf("OK: %v", err)
+		t.Fatalf("Play/Pause: %v", err)
 	}
 	if backend.launched != "calendar-work/open" || !withdrawn {
 		t.Fatalf("launched/withdrawn = %q/%v", backend.launched, withdrawn)
@@ -308,8 +308,8 @@ func TestRouterLauncherSceneUsesBothDisplaysWithExplicitLayout(t *testing.T) {
 	if got := launcherElement(t, shown, "front-position").Text.Align; got != "bottom_mid" {
 		t.Fatalf("front position alignment = %q, want bottom_mid", got)
 	}
-	if got := launcherElementText(t, shown, "back-action"); got != "OK TO OPEN" {
-		t.Fatalf("back action = %q, want OK TO OPEN", got)
+	if got := launcherElementText(t, shown, "back-action"); got != "PLAY: OPEN" {
+		t.Fatalf("back action = %q, want PLAY: OPEN", got)
 	}
 }
 
@@ -324,7 +324,7 @@ func launcherElement(t *testing.T, value protocol.Observation, id string) presen
 	return presentation.Element{}
 }
 
-func TestRouterConsumesStartWithoutChangingLauncher(t *testing.T) {
+func TestRouterIgnoresRotaryPress(t *testing.T) {
 	t.Parallel()
 	backend := &fakeLauncher{apps: []App{{ID: "calendar", Action: "open"}}}
 	withdrawn := false
@@ -333,7 +333,7 @@ func TestRouterConsumesStartWithoutChangingLauncher(t *testing.T) {
 	if err := router.Handle(t.Context(), switchPosition(inputpb.SwitchPosition_APPS)); err != nil {
 		t.Fatal(err)
 	}
-	if err := router.Handle(t.Context(), buttonPress(inputpb.Button_START)); err != nil {
+	if err := router.Handle(t.Context(), buttonPress(inputpb.Button_OK)); err != nil {
 		t.Fatal(err)
 	}
 	if backend.launched != "" || withdrawn || !router.Active() {
@@ -363,7 +363,7 @@ func TestRouterIgnoresButtonReleaseAndNonAppsInput(t *testing.T) {
 	backend := &fakeLauncher{apps: []App{{ID: "ball8", Action: "ask"}}}
 	router := NewRouter(backend, func(protocol.Observation) error { return nil }, func() {}, time.Now)
 	if err := router.Handle(context.Background(), &inputpb.InputEvent{Event: &inputpb.InputEvent_ButtonEvent{
-		ButtonEvent: &inputpb.ButtonEvent{Button: inputpb.Button_OK, Action: inputpb.ButtonAction_RELEASE},
+		ButtonEvent: &inputpb.ButtonEvent{Button: inputpb.Button_START, Action: inputpb.ButtonAction_RELEASE},
 	}}); err != nil {
 		t.Fatal(err)
 	}

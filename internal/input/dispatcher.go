@@ -31,6 +31,7 @@ type Dispatcher struct {
 	context      uint64
 	pendingClear func(context.Context)
 	status       DispatcherStatus
+	startHeld    bool
 }
 
 type queuedInput struct {
@@ -53,6 +54,20 @@ func (d *Dispatcher) Submit(event *inputpb.InputEvent) bool {
 	}
 	value, _ := proto.Clone(event).(*inputpb.InputEvent)
 	d.mu.Lock()
+	// Observe physical release before queue admission: a foreground change or
+	// overflow can discard its callback, but must not keep the button latched.
+	if button := value.GetButtonEvent(); button != nil && button.GetButton() == inputpb.Button_START {
+		switch button.GetAction() {
+		case inputpb.ButtonAction_RELEASE:
+			d.startHeld = false
+		case inputpb.ButtonAction_PRESS:
+			if d.startHeld {
+				d.mu.Unlock()
+				return true
+			}
+			d.startHeld = true
+		}
+	}
 	select {
 	case d.queue <- queuedInput{context: d.context, event: value}:
 		d.status.Accepted++

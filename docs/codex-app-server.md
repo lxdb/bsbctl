@@ -32,15 +32,17 @@ Open Codex from APPS for a read-only live view of the thread or run changed by t
 
 ## Answer a request
 
-Press START on an actionable card. For command, file, permission, or interrupt controls:
+Press Play/Pause on an actionable card. For command, file, permission, or interrupt controls:
 
 1. Rotate to select an option.
-2. Press OK to stage it.
-3. Press OK again to confirm.
+2. Press Play/Pause to stage it.
+3. Press Play/Pause again to confirm the named action.
 
 BACK clears a staged choice before closing the session.
 
-For `ASK`, rotate through the options and press OK to advance through the questions and submit the final answer. BACK cancels the device session; START has no effect while it is open. `Answer in Codex` closes the device session without submitting answers or interrupting the turn.
+For `ASK`, turn the knob to select an answer and press Play/Pause to advance to the next question. After the final question, turn the knob to review the answers and press Play/Pause to submit them.
+
+BACK from review returns to the final question. Within the questions, BACK returns to the previous question with its answer selected; BACK from the first question closes the device session. `Answer in Codex` closes the device session without submitting answers or interrupting the turn. Pressing the knob (OK) has no effect.
 
 Device answers support non-secret requests with at most eight questions and one to eight explicit options each. Secret, free-text-only, unsupported, or ambiguous requests remain display-only.
 

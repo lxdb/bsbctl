@@ -100,8 +100,6 @@ func (r *Router) Handle(ctx context.Context, event *inputpb.InputEvent) error {
 		}
 		switch button.GetButton() {
 		case inputpb.Button_START:
-			return nil
-		case inputpb.Button_OK:
 			r.mu.Lock()
 			if !r.active || len(r.apps) == 0 {
 				r.mu.Unlock()
@@ -158,7 +156,7 @@ func launcherScene(app, position string) *presentation.Scene {
 		launcherMarquee("back-app", protocol.DisplayBack, app, "large", launcherText, 8, 20, 132, ""),
 		launcherRectangle("back-divider", protocol.DisplayBack, 8, 45, 132, 1, launcherBorder),
 		launcherTextElement("back-position", protocol.DisplayBack, position, "small", launcherSecondary, 8, 52, ""),
-		launcherTextElement("back-action", protocol.DisplayBack, "OK TO OPEN", "small", launcherAccent, 140, 65, "top_right"),
+		launcherTextElement("back-action", protocol.DisplayBack, "PLAY: OPEN", "small", launcherAccent, 140, 65, "top_right"),
 	}}
 }
 

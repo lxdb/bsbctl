@@ -30,7 +30,7 @@ func TestRetirementJoinsAdmittedOpenAndPublisher(t *testing.T) {
 			if boundary == "open" {
 				h.open = func(ctx context.Context, _ string) error { return block(ctx) }
 				startPanel(t, h, w, nil)
-				_, _ = press(h, w, protocol.ButtonOK)
+				_, _ = press(h, w, protocol.ButtonStart)
 			} else {
 				host.publish = func(ctx context.Context, _ protocol.Observation) error { return block(ctx) }
 			}
@@ -113,7 +113,7 @@ func TestExecutionRechecksFreshnessAfterGrantAndCompletesAfterTimeout(t *testing
 		h.open = func(context.Context, string) error { opens++; return nil }
 		host.grant = func(context.Context) error { w.disconnected("auth_required"); return nil }
 		startPanel(t, h, w, nil)
-		_, _ = press(h, w, protocol.ButtonOK)
+		_, _ = press(h, w, protocol.ButtonStart)
 		if _, err := press(h, w, protocol.ButtonStart); err == nil {
 			t.Fatal("expired grant opened")
 		}
@@ -128,7 +128,7 @@ func TestExecutionRechecksFreshnessAfterGrantAndCompletesAfterTimeout(t *testing
 			w.live()
 			h.open = func(ctx context.Context, _ string) error { <-ctx.Done(); return ctx.Err() }
 			startPanel(t, h, w, nil)
-			_, _ = press(h, w, protocol.ButtonOK)
+			_, _ = press(h, w, protocol.ButtonStart)
 			at := time.Now()
 			if _, err := press(h, w, protocol.ButtonStart); err == nil {
 				t.Fatal("timeout succeeded")
@@ -146,7 +146,7 @@ func TestConfirmedHandlingCommitsEvenIfSourceExpiresDuringSave(t *testing.T) {
 		return nil
 	}
 	startPanel(t, h, w, nil)
-	_, _ = press(h, w, protocol.ButtonOK)
+	_, _ = press(h, w, protocol.ButtonStart)
 	_, _ = h.HandleSessionInput(t.Context(), protocol.SessionInputRequest{Instance: w.instance.Ref(), SessionToken: "session-1", Sequence: testInputSequence.Add(1), OccurredAt: w.now().UTC(), Input: protocol.SessionInput{Encoder: &protocol.EncoderInput{Delta: 1}}})
 	if _, err := press(h, w, protocol.ButtonStart); err != nil {
 		t.Fatal(err)
@@ -169,14 +169,22 @@ func TestCompletionFailureCannotRepeatOpenOrCrossSessions(t *testing.T) {
 	h.open = func(context.Context, string) error { opens++; return nil }
 	host.complete = func() error { return errors.New("completion failed") }
 	startPanel(t, h, w, nil)
-	_, _ = press(h, w, protocol.ButtonOK)
+	_, _ = press(h, w, protocol.ButtonStart)
 	for _, r := range []protocol.SessionInputRequest{
 		{Instance: protocol.InstanceRef{ID: "slack", Generation: 2}, SessionToken: "session-1"},
 		{Instance: protocol.InstanceRef{ID: "other", Generation: 1}, SessionToken: "session-1"},
 		{Instance: w.instance.Ref(), SessionToken: "other-session"},
 	} {
+		r.Sequence = testInputSequence.Add(1)
+		r.OccurredAt = w.now().UTC()
 		r.Input = protocol.SessionInput{Button: &protocol.ButtonInput{Button: protocol.ButtonStart, Action: protocol.ButtonPress}}
-		_, _ = h.HandleSessionInput(t.Context(), r)
+		if err := r.Validate(); err != nil {
+			t.Fatalf("invalid cross-session probe: %v", err)
+		}
+		result, _ := h.HandleSessionInput(t.Context(), r)
+		if result.Disposition != protocol.SessionInputNotConsumed {
+			t.Fatalf("cross-session input was consumed: %+v", r)
+		}
 	}
 	if opens != 0 {
 		t.Fatal("cross-session effect")

@@ -30,6 +30,7 @@ func TestPreviewScenesShowTheCodexFeatureTourWithProjectExamples(t *testing.T) {
 		{id: "front-state", value: "WAIT PERM"},
 		{id: "front-state", value: "ASK"},
 		{id: "front-option-label", value: "Codex and Calendar"},
+		{id: "front-review-answer", value: "Codex and Calendar"},
 		{id: "front-state", value: "COMPACT"},
 		{id: "front-state", value: "COMPACTED"},
 		{id: "front-state", value: "DONE"},
@@ -60,7 +61,8 @@ func TestPreviewScenesShowTheCodexFeatureTourWithProjectExamples(t *testing.T) {
 		"Command approval",
 		"File approval",
 		"Permission approval",
-		"START TO ANSWER",
+		"PLAY TO ANSWER",
+		"",
 		"",
 		"Compacting context",
 		"Context compacted",
@@ -84,6 +86,9 @@ func TestPreviewScenesShowTheCodexFeatureTourWithProjectExamples(t *testing.T) {
 	}
 	if got := previewText(scenes[9], "front-option-position"); got != "OPTION 1/2" {
 		t.Fatalf("front question option position = %q, want selected answer position", got)
+	}
+	if got := previewText(scenes[10], "back-review-action"); got != "PLAY: SUBMIT / BACK EDIT" {
+		t.Fatalf("review action = %q", got)
 	}
 }
 

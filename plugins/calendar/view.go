@@ -30,7 +30,7 @@ func calendarScene(card calendarCard) protocol.Scene {
 		calendarMarquee("back-title", "back", card.Title, "normal", calendarWhite, 30, 19, 122),
 		calendarStock("back-timer-icon", "image", "back", icon, 30, 40, false),
 		calendarCountdown("back-countdown", "back", timestamp, calendarWhite, 39, 38, ""),
-		calendarText("back-action", "back", "START / OPTIONS", "small", calendarAccent, 8, 66, ""),
+		calendarText("back-action", "back", "PLAY: OPTIONS", "small", calendarAccent, 8, 66, ""),
 	}
 	return protocol.Scene{Elements: elements}
 }

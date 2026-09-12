@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lxdb/bsbctl/plugins/codex"
 	"github.com/lxdb/bsbctl/sdk/protocol"
 	busylib "github.com/lxdb/busylib-go"
 )
@@ -18,6 +19,16 @@ func TestScenariosCompileTheProductionScenesWithMockAssets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Codex's tests own the feature sequence; the generator must retain every
+	// producer scene and give each one the same six-second capture interval.
+	codexScenes, err := codex.PreviewScenes(now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	codexDurations := make([]time.Duration, len(codexScenes))
+	for i := range codexDurations {
+		codexDurations[i] = 6 * time.Second
+	}
 	want := []struct {
 		name           string
 		file           string
@@ -26,11 +37,7 @@ func TestScenariosCompileTheProductionScenesWithMockAssets(t *testing.T) {
 		durations      []time.Duration
 	}{
 		{name: "Calendar", file: "calendar-front.gif", capture: true, sampleInterval: 250 * time.Millisecond, durations: []time.Duration{6 * time.Second, 6 * time.Second, 2 * time.Second, 2 * time.Second, 2 * time.Second}},
-		{name: "Codex", file: "codex-front.gif", capture: true, sampleInterval: 300 * time.Millisecond, durations: []time.Duration{
-			6 * time.Second, 6 * time.Second, 6 * time.Second, 6 * time.Second, 6 * time.Second,
-			6 * time.Second, 6 * time.Second, 6 * time.Second, 6 * time.Second, 6 * time.Second,
-			6 * time.Second, 6 * time.Second, 6 * time.Second, 6 * time.Second, 6 * time.Second,
-		}},
+		{name: "Codex", file: "codex-front.gif", capture: true, sampleInterval: 300 * time.Millisecond, durations: codexDurations},
 		{name: "Codex quota", file: "codex-quota-front.gif", capture: true, sampleInterval: 250 * time.Millisecond, durations: []time.Duration{2 * time.Second, 2 * time.Second}},
 		{name: "GitHub notifications", file: "github-notifications-front.gif", capture: true, sampleInterval: 300 * time.Millisecond, durations: []time.Duration{30 * time.Second, 30 * time.Second}},
 		{name: "Mac resources", file: "mac-resources-front.gif", sampleInterval: 250 * time.Millisecond, durations: []time.Duration{2 * time.Second, 2 * time.Second, 2 * time.Second}},
@@ -41,8 +48,11 @@ func TestScenariosCompileTheProductionScenesWithMockAssets(t *testing.T) {
 	}
 	for index, expected := range want {
 		scenario := scenarios[index]
-		if scenario.Name != expected.name || scenario.File != expected.file || scenario.Capture != expected.capture || scenario.SampleInterval != expected.sampleInterval || len(scenario.Steps) != len(expected.durations) {
-			t.Fatalf("scenario %d = %#v, want %#v", index, scenario, expected)
+		if scenario.Name != expected.name || scenario.File != expected.file || scenario.Capture != expected.capture || scenario.SampleInterval != expected.sampleInterval {
+			t.Fatalf("scenario %d metadata = %q/%q/capture=%t/interval=%s, want %q/%q/capture=%t/interval=%s", index, scenario.Name, scenario.File, scenario.Capture, scenario.SampleInterval, expected.name, expected.file, expected.capture, expected.sampleInterval)
+		}
+		if len(scenario.Steps) != len(expected.durations) {
+			t.Fatalf("%s steps = %d, want %d", scenario.Name, len(scenario.Steps), len(expected.durations))
 		}
 		var duration time.Duration
 		for stepIndex, step := range scenario.Steps {

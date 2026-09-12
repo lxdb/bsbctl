@@ -74,7 +74,7 @@ func testBackHandling(publish SessionInputResultPublisher, consumed func(context
 	}
 }
 
-func TestCoordinatorMakesAppsExclusiveAndConsumesOpeningOK(t *testing.T) {
+func TestCoordinatorMakesAppsExclusiveAndConsumesOpeningStart(t *testing.T) {
 	launcherBackend := &fakeLauncher{apps: []App{{ID: "codex", Action: "open"}}}
 	router := NewRouter(launcherBackend, func(protocol.Observation) error { return nil }, func() {}, time.Now)
 	sessions := &coordinatorSessions{instance: "old", token: "session-old"}
@@ -91,14 +91,14 @@ func TestCoordinatorMakesAppsExclusiveAndConsumesOpeningOK(t *testing.T) {
 	if len(sessions.cleared) != 1 || sessions.cleared[0] != (SessionTarget{InstanceID: "old", Token: "session-old"}) {
 		t.Fatalf("cleared sessions = %#v", sessions.cleared)
 	}
-	if err := coordinator.Handle(context.Background(), buttonPress(inputpb.Button_OK)); err != nil {
+	if err := coordinator.Handle(context.Background(), buttonPress(inputpb.Button_START)); err != nil {
 		t.Fatal(err)
 	}
 	if launcherBackend.launched != "codex/open" {
 		t.Fatalf("launcher invocation = %q", launcherBackend.launched)
 	}
 	if len(published) != 0 || activator.calls != 0 {
-		t.Fatalf("opening OK leaked: published=%#v activations=%d", published, activator.calls)
+		t.Fatalf("opening Start leaked: published=%#v activations=%d", published, activator.calls)
 	}
 }
 
@@ -155,8 +155,8 @@ func TestCoordinatorStartIsConsumedWhileLauncherIsActive(t *testing.T) {
 	if err := coordinator.Handle(context.Background(), buttonPress(inputpb.Button_START)); err != nil {
 		t.Fatal(err)
 	}
-	if activator.calls != 0 || launcherBackend.launched != "" || !router.Active() {
-		t.Fatalf("activation/launcher/active = %d/%q/%v, want consumed Start and active launcher", activator.calls, launcherBackend.launched, router.Active())
+	if activator.calls != 0 || launcherBackend.launched != "codex/open" || router.Active() {
+		t.Fatalf("activation/launcher/active = %d/%q/%v, want launcher-only activation", activator.calls, launcherBackend.launched, router.Active())
 	}
 }
 
