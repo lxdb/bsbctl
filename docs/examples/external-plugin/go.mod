@@ -1,6 +1,6 @@
 module example.com/bsbctl-plugin-hello
 
-go 1.26
+go 1.26.0
 
 require github.com/lxdb/bsbctl v0.1.0
 

@@ -17,7 +17,7 @@ func TestExternalModuleCanImplementHandlerUsingOnlyPublicSDKPackages(t *testing.
 	}
 	repositoryRoot := filepath.Clean(filepath.Join(filepath.Dir(testFile), "..", ".."))
 	moduleRoot := t.TempDir()
-	goMod := "module example.com/external-plugin\n\ngo 1.26\n\nrequire github.com/lxdb/bsbctl v0.0.0\n\nreplace github.com/lxdb/bsbctl => " + repositoryRoot + "\n"
+	goMod := "module example.com/external-plugin\n\ngo 1.26.0\n\nrequire github.com/lxdb/bsbctl v0.0.0\n\nreplace github.com/lxdb/bsbctl => " + repositoryRoot + "\n"
 	mainGo := `package main
 
 import (
